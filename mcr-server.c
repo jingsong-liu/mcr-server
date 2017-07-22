@@ -8,22 +8,13 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <pthread.h>
-/* 
-int socket(int domain, int type, int protocol);
 
-int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 
-struct sockaddr {
-    sa_family_t sa_family;
-    char        sa_data[14];
-}
-
-int listen(int sockfd, int backlog);
-*/
 
 #define HOST_ADDRESS    "localhost"
 #define LISTEN_PORT     8082
-
+#define BACK_LOG        128
+#define RECEIVE_BUFFER_SIZE     4096
 
 struct cli_args {
     int fd;
@@ -31,7 +22,7 @@ struct cli_args {
 
 void *
 sk_conn(void* arg) {
-    char buf[1024];
+    char buf[RECEIVE_BUFFER_SIZE];
     int fd = ((struct cli_args*)arg)->fd;
     struct sockaddr_in cli_addr ;
     int cliaddr_len = sizeof(cli_addr);
@@ -66,7 +57,7 @@ sk_conn(void* arg) {
 }
 
 int
-sk_listen() {
+server_init() {
     int sock;
     struct sockaddr_in addr;
     sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -84,7 +75,7 @@ sk_listen() {
         goto err2;
     }
 
-    if (0 != listen(sock, 3)) {
+    if (0 != listen(sock, BACK_LOG)) {
         printf("listen error: %s\n", strerror(errno)); 
         goto err2;
     }
@@ -99,21 +90,17 @@ sk_listen() {
 }
 
 int
-main(void)
+serve(int server_sock)
 {
-    int sock = 0;
-    if ((sock = sk_listen()) == -1)
-        exit(0);
-         
     struct sockaddr_in client_addr;
     int client_addr_len= sizeof(client_addr);
     pthread_t pid;
     struct cli_args cargs;
     while(1) {
-        int new_fd = accept(sock, (struct sockaddr*)&client_addr, &client_addr_len);
+        int new_fd = accept(server_sock, (struct sockaddr*)&client_addr, &client_addr_len);
         if (new_fd < 0) {
             printf("accept error: %s\n", strerror(errno));
-            goto err;
+            return -1;
         }
         
         printf("accept a connect from %s:%d\n",inet_ntoa(client_addr.sin_addr),
@@ -122,15 +109,101 @@ main(void)
         cargs.fd = new_fd;
         if(0 != pthread_create(&pid, NULL, sk_conn, (void *)&cargs)) {
             printf("create pthread error: %s\n", strerror(errno));
-            goto err;
+            return -1;
         }
         //pthread_detach(pid);
+    }
+
+    //cloase child thread?
+
+    return 0;
+}
+
+int
+main(void)
+{
+    struct addrinfo hint;
+    memset(&hint, 0, sizeof(hint));
+    hint.ai_flags = AI_ALL;
+    hint.ai_family = AF_INET;
+    hint.ai_socktype = SOCK_STREAM;
+
+    struct addrinfo * ai_list, *aip;
+    struct server_config config;
+    if ( -1 == read_server_config(SERVER_CONFIG_FILE, &config)) {
 
     }
 
+    if (-1 == getaddrinfo(config.hostname, config.service, &hint, &ai_list))
+    {
+        printf("get host address error:%s", gai_strerror(errno));
+    } else {
+        printf("available host address info:\n");
+        struct sockaddr_in * addr_in;
+        for (aip = ai_list; aip != NULL; aip = ai_list->ai_next)
+        {
+            addr_in = (struct sockaddr_in*)(aip->ai_addr);
+            printf("%s, %s, %d \n", aip->ai_canonname, inet_ntoa(addr_in->sin_addr), ntohs(addr_in->sin_port));
+        }
+    }
+
+    int server_sock = 0;
+    if ((sock = server_init()) == -1)
+        exit(0);
+    if (-1 == serve(server_sock)) {
+        printf("server loop exited unexpected.");
+    }
+
+    close(server_sock);
+    return -1;
+}
+
+#define HOST_NAME_MAX           256
+#define SERVICE_NAME_MAX        128
+struct server_config {
+    char hostname[HOST_NAME_MAX];
+    char service[SERVICE_NAME_MAX];
+    int port;
+
+};
+
+int
+read_server_config(const char* path, struct server_config* sc)
+{
+    int fd;
+    if ((fd = open(path, O_RDONLY)) == -1) {
+        printf("open config error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    char buf[1024];
+    ssize_t len = read(fd, buf, sizeof(buf));
+    if (-1 == len) {
+        printf("read config error: %s\n", strerror(errno));
+        goto err;
+    } else if (0 == len) {
+        goto err;
+    } else {
+        //parse host and service from buf
+        get_dict(buf, len, "HostName:", sc->hostname);
+        get_dict(buf, len, "Service:", sc->service);
+    }
+    close(fd);
+    return 0;
+
     err:
-        close(sock);
+        close(fd);
         return -1;
 }
 
+int
+get_dict(char* buf, ssize_t len, const char* key, char* value)
+{
+    char *p;
+    buf[len-1] = '\0';
+    p = strstr(buf, key) + strlen(key) + 1;
+    
+    strncpy(value, p, strchr(p, ' ') - p);
 
+    return 0;
+}
