@@ -8,20 +8,20 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include "include/server_config.h"
 
 
 
-#define HOST_ADDRESS    "localhost"
-#define LISTEN_PORT     8082
-#define BACK_LOG        128
+#define DEFAULT_QUEUE_SIZE           128
 #define RECEIVE_BUFFER_SIZE     4096
 
 struct cli_args {
     int fd;
+    int reserved;
 };
 
 void *
-sk_conn(void* arg) {
+cli_conn(void* arg) {
     char buf[RECEIVE_BUFFER_SIZE];
     int fd = ((struct cli_args*)arg)->fd;
     struct sockaddr_in cli_addr ;
@@ -57,29 +57,26 @@ sk_conn(void* arg) {
 }
 
 int
-server_init() {
+server_init(int type, struct sockaddr_in* server_addr, int qlen) {
     int sock;
     struct sockaddr_in addr;
-    sock = socket(AF_INET, SOCK_STREAM, 0);
+    sock = socket(AF_INET, type, 0);
     if (-1 == sock) {
         printf("create socket error: %s\n", strerror(errno));
         goto err1;
     }
 
-    addr.sin_family = AF_INET;
-    inet_aton(HOST_ADDRESS, &(addr.sin_addr));
-    addr.sin_port = htons(LISTEN_PORT);
-
-    if (0 != bind(sock, (struct sockaddr *)&addr, sizeof(addr))) {
+    if (0 != bind(sock, (struct sockaddr *)&server_addr, sizeof(server_addr))) {
         printf("bind error: %s\n", strerror(errno));
         goto err2;
     }
 
-    if (0 != listen(sock, BACK_LOG)) {
+    if (0 != listen(sock, qlen)) {
         printf("listen error: %s\n", strerror(errno)); 
         goto err2;
     }
-    printf("start listenning on port %d...\n", ntohs(addr.sin_port));
+    printf("start listenning on %s:%d queue size %d.\n", inet_ntoa(server_addr.sin_addr),
+     ntohs(server_addr.sin_port), qlen);
         return sock;
 
     err2:
@@ -107,7 +104,7 @@ serve(int server_sock)
             ntohs(client_addr.sin_port));
 
         cargs.fd = new_fd;
-        if(0 != pthread_create(&pid, NULL, sk_conn, (void *)&cargs)) {
+        if(0 != pthread_create(&pid, NULL, cli_conn, (void *)&cargs)) {
             printf("create pthread error: %s\n", strerror(errno));
             return -1;
         }
@@ -120,90 +117,71 @@ serve(int server_sock)
 }
 
 int
-main(void)
-{
+select_addr_info(char* hostname, char* service, struct addrinfo** ai_list) {
     struct addrinfo hint;
     memset(&hint, 0, sizeof(hint));
     hint.ai_flags = AI_ALL;
     hint.ai_family = AF_INET;
     hint.ai_socktype = SOCK_STREAM;
 
-    struct addrinfo * ai_list, *aip;
-    struct server_config config;
-    if ( -1 == read_server_config(SERVER_CONFIG_FILE, &config)) {
-
-    }
-
-    if (-1 == getaddrinfo(config.hostname, config.service, &hint, &ai_list))
+    if (-1 == getaddrinfo(hostname, service, &hint, ai_list))
     {
         printf("get host address error:%s", gai_strerror(errno));
+        return -1;
     } else {
-        printf("available host address info:\n");
-        struct sockaddr_in * addr_in;
+        printf("available host address info for %s:%s\n", hostname, service);
+        struct addrinfo *aip;
+        int cnt = 0;
         for (aip = ai_list; aip != NULL; aip = ai_list->ai_next)
         {
-            addr_in = (struct sockaddr_in*)(aip->ai_addr);
-            printf("%s, %s, %d \n", aip->ai_canonname, inet_ntoa(addr_in->sin_addr), ntohs(addr_in->sin_port));
+            struct sockaddr_in addr_in = (struct sockaddr_in*)(aip->ai_addr);
+            printf("%s, %s, %d \n", aip->ai_canonname, inet_ntoa(addr_in->sin_addr),
+                 ntohs(addr_in->sin_port));
+            cnt ++;
+        }
+        return cnt;
+    }
+}
+
+int
+main(void)
+{
+
+    int config_invalid = 0;
+    struct server_config config;
+    if ( -1 == read_server_config(SERVER_CONFIG_FILE, &config)) {
+        printf("error read_server_config :%s\n", strerror(errno);
+    }
+
+    struct addrinfo * ai_list = NULL, * ai;
+    select_addr_info(config.hostname, config.service, &ai_list);
+
+    int server_sock = 0;
+    for (ai = ai_list; ai ! = NULL; ai = ai_list->ai_next) {
+        if ((server_sock = server_init(SOCK_STREAM, server_addr, config.queue_size)) != -1) {
+            // just use first host address
+            addr_valid = 1;
+            break;
         }
     }
 
-    int server_sock = 0;
-    if ((sock = server_init()) == -1)
-        exit(0);
+    if (!addr_vlid) {
+        printf("host address config seems unavailable, we try to use localhost ");
+        select_addr_info("localhost", "http", &ai_list);
+        for (ai = ai_list; ai ! = NULL; ai = ai_list->ai_next) {
+            if ((server_sock = server_init(SOCK_STREAM, server_addr, config.queue_size)) != -1) {
+                // just use first host address
+                struct sockaddr_in addr_in = (struct sockaddr_in*)(aip->ai_addr);
+                printf("%s:%d \n", inet_ntoa(addr_in->sin_addr), ntohs(addr_in->sin_port));
+                break;
+            }
+        }
+    }
+
     if (-1 == serve(server_sock)) {
-        printf("server loop exited unexpected.");
+        printf("server loop exited unexpected, error: %s.", strerror(errno));
     }
 
     close(server_sock);
     return -1;
-}
-
-#define HOST_NAME_MAX           256
-#define SERVICE_NAME_MAX        128
-struct server_config {
-    char hostname[HOST_NAME_MAX];
-    char service[SERVICE_NAME_MAX];
-    int port;
-
-};
-
-int
-read_server_config(const char* path, struct server_config* sc)
-{
-    int fd;
-    if ((fd = open(path, O_RDONLY)) == -1) {
-        printf("open config error: %s\n", strerror(errno));
-        return -1;
-    }
-
-    char buf[1024];
-    ssize_t len = read(fd, buf, sizeof(buf));
-    if (-1 == len) {
-        printf("read config error: %s\n", strerror(errno));
-        goto err;
-    } else if (0 == len) {
-        goto err;
-    } else {
-        //parse host and service from buf
-        get_dict(buf, len, "HostName:", sc->hostname);
-        get_dict(buf, len, "Service:", sc->service);
-    }
-    close(fd);
-    return 0;
-
-    err:
-        close(fd);
-        return -1;
-}
-
-int
-get_dict(char* buf, ssize_t len, const char* key, char* value)
-{
-    char *p;
-    buf[len-1] = '\0';
-    p = strstr(buf, key) + strlen(key) + 1;
-    
-    strncpy(value, p, strchr(p, ' ') - p);
-
-    return 0;
 }
