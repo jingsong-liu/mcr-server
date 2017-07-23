@@ -7,6 +7,7 @@
 
 #define HOST_NAME_MAX           256
 #define SERVICE_NAME_MAX        128
+#define QUEUE_SIZE_MAX          6
 
 struct server_config {
     char hostname[HOST_NAME_MAX];
