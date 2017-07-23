@@ -1,22 +1,24 @@
 INCDIR = include
+OBJDIR = obj
+
 CC=gcc
-CFLAGS = -I$(INCDIR)
+CFLAGS= -I$(INCDIR)
 
-ODIR = obj
+LIBS ?= -lpthread
 
-LIBS = -lpthread
+DEPS = $(wildcard $(INCDIR)/*.h)
 
-_DEPS = server_cofnig.h
-DEPS = $(_DEPS)
+SRC = $(wildcard *.c)
+OBJ = $(patsubst %.c, $(OBJDIR)/%.o, $(SRC))
 
-_OBJ = server_config.o mcr_server.o
-OBJ = $(_OBJ)
 
 mcr-server: $(OBJ)
-	$(CC) -o $@ $(OBJ) $(CFLAGS) $(LIBS) 
+	$(CC) -o $@ $^ $(CFLAGS) $(LIBS) 
+
+$(OBJDIR)/%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS) 
 
 .PHONY: clean
 
 clean:
-	rm -f *.o $(binaries)
-	echo Clean Done
+	rm -f *.o $(OBJDIR)/*.o

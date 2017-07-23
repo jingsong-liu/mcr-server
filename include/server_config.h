@@ -17,6 +17,6 @@ struct server_config {
 };
 
 int
-read_server_config(const char* path, struct server_config* sc)
+read_server_config(const char* path, struct server_config* sc);
 
 #endif
