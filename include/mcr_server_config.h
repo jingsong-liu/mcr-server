@@ -5,15 +5,17 @@
 #include <errno.h>
 
 
-#define HOST_NAME_MAX           256
+#define HOST_NAME_MAX           128
 #define SERVICE_NAME_MAX        128
-#define QUEUE_SIZE_MAX          6
+#define BACKLOG_MAX             6
+#define PORT_MAX             6
+
 
 struct server_config {
     char hostname[HOST_NAME_MAX];
     char service[SERVICE_NAME_MAX];
     int port;
-    int queue_size;
+    int backlog;
 
 };
 

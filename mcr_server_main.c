@@ -9,11 +9,11 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <netdb.h>
-#include "include/server_config.h"
+#include "include/mcr_server_config.h"
 
 
 
-#define DEFAULT_QUEUE_SIZE           128
+#define DEFAULT_backlog           128
 #define RECEIVE_BUFFER_SIZE     4096
 #define SERVER_CONFIG_FILE      "./default.conf"
 
@@ -21,6 +21,7 @@ struct cli_args {
     int fd;
     int reserved;
 };
+
 
 void *
 cli_conn(void* arg) {
@@ -58,10 +59,10 @@ cli_conn(void* arg) {
     pthread_exit(0);
 }
 
+
 int
 server_init(int type, struct sockaddr_in* server_addr, int qlen) {
     int sock;
-    struct sockaddr_in addr;
     sock = socket(AF_INET, type, 0);
     if (-1 == sock) {
         printf("create socket error: %s\n", strerror(errno));
@@ -92,7 +93,7 @@ int
 serve(int server_sock)
 {
     struct sockaddr_in client_addr;
-    int client_addr_len= sizeof(client_addr);
+    socklen_t client_addr_len= sizeof(client_addr);
     pthread_t pid;
     struct cli_args cargs;
     while(1) {
@@ -117,6 +118,7 @@ serve(int server_sock)
 
     return 0;
 }
+
 
 int
 select_addr_info(char* hostname, char* service, struct addrinfo** ai_list) {
@@ -146,6 +148,7 @@ select_addr_info(char* hostname, char* service, struct addrinfo** ai_list) {
     }
 }
 
+
 int
 main(void)
 {
@@ -158,19 +161,27 @@ main(void)
     struct addrinfo * ai_list = NULL, * ai;
     select_addr_info(config.hostname, config.service, &ai_list);
 
+	/* for test */
+	((struct sockaddr_in*)(ai_list->ai_addr))->sin_port = 8082;
+	config.backlog = 5;
+
     int server_sock = 0;
     for (ai = ai_list; ai != NULL; ai = ai_list->ai_next) {
-        if ((server_sock = server_init(SOCK_STREAM, (struct sockaddr_in*)(ai->ai_addr), config.queue_size)) != -1) {
+        if ((server_sock = server_init(SOCK_STREAM, (struct sockaddr_in*)(ai->ai_addr), config.backlog)) != -1) {
             // just use first host address
             break;
         }
+
+		return 0;
     }
+	return 0;
+
 
     if (0 == server_sock || -1 == server_sock) {
         printf("host address config seems unavailable, we try to use localhost ");
         select_addr_info("localhost", "http", &ai_list);
         for (ai = ai_list; ai != NULL; ai = ai_list->ai_next) {
-            if ((server_sock = server_init(SOCK_STREAM, (struct sockaddr_in*)(ai->ai_addr), config.queue_size)) != -1) {
+            if ((server_sock = server_init(SOCK_STREAM, (struct sockaddr_in*)(ai->ai_addr), config.backlog)) != -1) {
                 // just use first host address
                 struct sockaddr_in* addr_in = (struct sockaddr_in*)(ai->ai_addr);
                 printf("%s:%d \n", inet_ntoa(addr_in->sin_addr), ntohs(addr_in->sin_port));
