@@ -3,7 +3,7 @@ OBJDIR = obj
 
 CC=gcc
 CFLAGS= -I$(INCDIR) -Wall
-DBG= -g
+DBG_FLAG= -g
 TEST_FLAG = -DTEST
 
 LIBS ?= -lpthread
@@ -15,7 +15,7 @@ OBJ = $(patsubst %.c, $(OBJDIR)/%.o, $(SRC))
 
 
 mcr-server: $(OBJ)
-	$(CC) -o $@ $^ $(CFLAGS) $(LIBS) 
+	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)  $(DBG_FLAG)
 
 $(OBJDIR)/%.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS) 

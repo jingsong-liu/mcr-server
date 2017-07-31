@@ -61,7 +61,7 @@ cli_conn(void* arg) {
 
 
 int
-server_init(int type, struct sockaddr_in* server_addr, int qlen) {
+server_init(int type, struct sockaddr_in* server_addr, int backlog) {
     int sock;
     sock = socket(AF_INET, type, 0);
     if (-1 == sock) {
@@ -70,23 +70,22 @@ server_init(int type, struct sockaddr_in* server_addr, int qlen) {
     }
 
     if (0 != bind(sock, (struct sockaddr *)server_addr, sizeof(struct sockaddr_in))) {
-        printf("bind error: %s\n", strerror(errno));
+        printf("bind to %s:%d failed: %s\n", inet_ntoa(server_addr->sin_addr), ntohs(server_addr->sin_port), strerror(errno));
         goto err2;
     }
 
-    if (0 != listen(sock, qlen)) {
+    if (0 != listen(sock, backlog)) {
         printf("listen error: %s\n", strerror(errno)); 
         goto err2;
     }
-    printf("start listenning on %s:%d queue size %d.\n", inet_ntoa(server_addr->sin_addr),
-     ntohs(server_addr->sin_port), qlen);
+
+    printf("successfully start listenning on %s:%d\n", inet_ntoa(server_addr->sin_addr),ntohs(server_addr->sin_port));
         return sock;
 
     err2:
         close(sock);
     err1:
         return -1;
-
 }
 
 int
@@ -128,23 +127,12 @@ select_addr_info(char* hostname, char* service, struct addrinfo** ai_list) {
     hint.ai_family = AF_INET;
     hint.ai_socktype = SOCK_STREAM;
 
-    if (-1 == getaddrinfo(hostname, service, &hint, ai_list))
+    if (0 != getaddrinfo(hostname, service, &hint, ai_list))
     {
         printf("get host address error:%s", gai_strerror(errno));
         return -1;
     } else {
-        printf("available host address info for %s:%s\n", hostname, service);
-        struct addrinfo *aip;
-        int cnt = 0;
-        for (aip = *ai_list; aip != NULL; aip = (*ai_list)->ai_next)
-        {
-            struct sockaddr_in* addr_in = (struct sockaddr_in*)(aip->ai_addr);
-            printf("%s, %s, %d \n", aip->ai_canonname, inet_ntoa(addr_in->sin_addr),
-                 ntohs(addr_in->sin_port));
-            cnt ++;
-            if (cnt > 32) break;
-        }
-        return cnt;
+        return 0;
     }
 }
 
@@ -165,7 +153,7 @@ main(void)
     ((struct sockaddr_in*)(ai_list->ai_addr))->sin_port = 8082;
     config.backlog = 5;
 
-    int server_sock = 0;
+    int server_sock = -1;
     for (ai = ai_list; ai != NULL; ai = ai_list->ai_next) {
         if ((server_sock = server_init(SOCK_STREAM, (struct sockaddr_in*)(ai->ai_addr), config.backlog)) != -1) {
             // just use first host address
@@ -173,18 +161,21 @@ main(void)
         }
     }
 
-    if (0 == server_sock || -1 == server_sock) {
-        printf("host address config seems unavailable, we try to use localhost ");
+
+    if (-1 == server_sock) {
+        printf("host address config seems unavailable, we try to use localhost\n");
         select_addr_info("localhost", "http", &ai_list);
         for (ai = ai_list; ai != NULL; ai = ai_list->ai_next) {
             if ((server_sock = server_init(SOCK_STREAM, (struct sockaddr_in*)(ai->ai_addr), config.backlog)) != -1) {
                 // just use first host address
-                struct sockaddr_in* addr_in = (struct sockaddr_in*)(ai->ai_addr);
-                printf("%s:%d \n", inet_ntoa(addr_in->sin_addr), ntohs(addr_in->sin_port));
                 break;
             }
+
+            break;
         }
     }
+
+	freeaddrinfo(ai_list);
 
     if (-1 == serve(server_sock)) {
         printf("server loop exited unexpected, error: %s.", strerror(errno));
