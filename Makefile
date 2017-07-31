@@ -2,7 +2,9 @@ INCDIR = include
 OBJDIR = obj
 
 CC=gcc
-CFLAGS= -I$(INCDIR)
+CFLAGS= -I$(INCDIR) -Wall
+DBG= -g
+TEST_FLAG = -DTEST
 
 LIBS ?= -lpthread
 
