@@ -149,10 +149,6 @@ main(void)
     struct addrinfo * ai_list = NULL, * ai;
     select_addr_info(config.hostname, config.service, &ai_list);
 
-    /* for test */
-    ((struct sockaddr_in*)(ai_list->ai_addr))->sin_port = 8082;
-    config.backlog = 5;
-
     int server_sock = -1;
     for (ai = ai_list; ai != NULL; ai = ai_list->ai_next) {
         if ((server_sock = server_init(SOCK_STREAM, (struct sockaddr_in*)(ai->ai_addr), config.backlog)) != -1) {
@@ -162,6 +158,7 @@ main(void)
     }
 
 
+    /* try localhost:http */
     if (-1 == server_sock) {
         printf("host address config seems unavailable, we try to use localhost\n");
         select_addr_info("localhost", "http", &ai_list);
