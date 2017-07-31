@@ -22,4 +22,7 @@ struct server_config {
 int
 read_server_config(const char* path, struct server_config* sc);
 
+char*
+dump_server_config(struct server_config* sc, char* buf, size_t size);
+
 #endif

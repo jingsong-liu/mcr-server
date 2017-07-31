@@ -73,8 +73,12 @@ read_server_config(const char* path, struct server_config* sc)
     }
 
     char buf[4*1024];
-    struct dict *dlist = dict_init(NULL);
-    if (dlist == NULL) {
+    //TODO: implement as linklist
+    struct dict *d3 = dict_init(NULL);
+    struct dict *d2 = dict_init(d3);
+    struct dict *d1 = dict_init(d2);
+    struct dict *dlist = dict_init(d1);
+    if (dlist == NULL) { /* d1 | d2 |d3 | == NULL...*/
         close(fd);
         return -1;
     }
@@ -104,7 +108,8 @@ read_server_config(const char* path, struct server_config* sc)
             d = d->next;
         }
 
-        dict_deinit(dlist);
+        // TODO: ...freee list.
+        dict_deinit(dlist); // deinit d1 ,d2, d3, d4 ...
         close(fd);
         return 0;
     }
@@ -118,14 +123,14 @@ read_server_config(const char* path, struct server_config* sc)
 char*
 dump_server_config(struct server_config* sc, char* buf, size_t size)
 {
-    snprintf(buf, size, "%s\n %s\n %d\n %d\n",
+    snprintf(buf, size, "%s\n%s\n%d\n%d\n",
         sc->hostname, sc->service, sc->port, sc->backlog);
 
     return buf;
 }
 
 
-#ifdef TEST
+#ifdef SERVERCONFIG_TEST
 int
 main(int argc, char** argv)
 {

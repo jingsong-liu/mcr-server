@@ -95,6 +95,11 @@ to_dict(char* buf, struct dict *diclist) {
             dic->next = NULL;
         }
 
+        /* line started with '#' is comment */
+        if (*cl == '#') {
+            goto next;
+        }
+
         if (l == 0) {
             goto next;
         }
@@ -157,20 +162,65 @@ dict_dump(const struct dict *dic, char* buf, size_t size) {
 }
 
 
+void dictlist_init_head(struct dict *head)
+{
+    head->next = NULL;
 
-#ifdef TEST
+}
+
+
+static inline void
+_dictlist_add(struct dict *cur,  struct dict *new)
+{
+    struct dict *tmp = cur->next;
+    cur->next = new;
+    new->next = tmp;
+}
+
+
+
+void diclist_insert(struct dict *cur, struct dict *new)
+{
+    _dictlist_add(cur, new);
+}
+
+
+void dictlist_add_tail(struct dict *head, struct dict *new)
+{
+    struct dict *tail = head;
+    while (tail->next != NULL) {
+        tail = tail->next;
+    }
+    _dictlist_add(tail, new);
+}
+
+
+void dictlist_del_tail(struct dict *head)
+{
+    struct dict *tail = head;
+    struct dict *tail_1 = NULL;
+    while (tail->next != NULL) {
+        tail_1 = tail;
+        tail = tail->next;
+    }
+    tail_1->next = NULL;
+}
+
+
+#ifdef DICT_TEST
 int
 main(int argc, char** argv)
 {
     /* test to_dict */
-    struct dict *dl_test, *dl_test1;
-    dl_test1 = dict_init(NULL);
+    struct dict *dl_test, *dl_test1, *dl_test2;
+    dl_test2 = dict_init(NULL);
+    dl_test1 = dict_init(dl_test2);
     dl_test = dict_init(dl_test1);
     if (!dl_test || !dl_test1) {
         printf("error init dict: %s\n", strerror(errno));
     }
 
-    int ret = to_dict("host: www.exmple.com zz.com dead.\nservice:mysql web ", dl_test);
+    int ret = to_dict("host: www.exmple.com zz.com dead.\n#service:mysql web\nPort:8080 8081", dl_test);
     printf("to_dict ret:%d\n", ret);
     struct dict *dl = dl_test;
     char buf_test_dict[MAX_WORD_NUM*MAX_WORD_SIZE];

@@ -55,6 +55,7 @@ to_words(const char* buf, char **words, int w_maxnum)
         for (w_start = p; w_start < buf_end; w_start ++) {
             if ((*w_start >= 'a' && *w_start <= 'z') ||
                 (*w_start >= 'A' && *w_start <= 'Z') ||
+                (*w_start >= '0' && *w_start <= '9') ||
                 (*w_start == '_'))
                 break;
         }
@@ -80,7 +81,7 @@ to_words(const char* buf, char **words, int w_maxnum)
                 if ((*(w_end + 1) == ' ')  ||
                     (*(w_end + 1) == '\t') ||
                     (*(w_end + 1) == '\n') ||
-                    (*(w_end + i) == '\0') ) {
+                    (*(w_end + 1) == '\0') ) {
                     break;
                 }
             }
@@ -103,7 +104,7 @@ to_words(const char* buf, char **words, int w_maxnum)
 }
 
 
-#ifdef TEST
+#ifdef TEXT_TEST
 #include <stdlib.h>
 int main(int argc, char** argv) 
     {
@@ -147,7 +148,7 @@ int main(int argc, char** argv)
     for (int i = 0; i < 20 ; i++) {
         *(words + i) = (char*)malloc(sizeof(char)*128);
     }
-    int ret = to_words("China is the greatest country in the world! do you agree? _QNMLGBD\n", words, 20);
+    int ret = to_words("China is the greatest country in the world! do you agree? _MLGBD 2333\n", words, 20);
     printf("to_words ret:%d\n", ret);
     for ( int i = 0; i < 20; i++ ) {
         if (strlen(*(words+i)) == 0)
