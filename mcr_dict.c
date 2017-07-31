@@ -10,71 +10,71 @@
 
 struct dict*
 dict_init(struct dict *next) {
-	struct dict *dic = (struct dict*)malloc(sizeof(struct dict));
-	if (dic == NULL) {
-		return NULL;
-	}
+    struct dict *dic = (struct dict*)malloc(sizeof(struct dict));
+    if (dic == NULL) {
+        return NULL;
+    }
 
-	dic->key =  (char*)malloc(MAX_WORD_SIZE*sizeof(char));
-	if (dic->key == NULL) {
-		free(dic);
-		return NULL;
-	}
+    dic->key =  (char*)malloc(MAX_WORD_SIZE*sizeof(char));
+    if (dic->key == NULL) {
+        free(dic);
+        return NULL;
+    }
 
-	dic->values = (char**)malloc(MAX_WORD_NUM*sizeof(char*));
-	if (dic->values == NULL) {
-		free(dic->key);
-		free(dic);
-		return NULL;
-	}
+    dic->values = (char**)malloc(MAX_WORD_NUM*sizeof(char*));
+    if (dic->values == NULL) {
+        free(dic->key);
+        free(dic);
+        return NULL;
+    }
 
-	for (int i =0; i < MAX_WORD_NUM; i++) {
-		*(dic->values + i) = (char*)malloc(MAX_WORD_SIZE*sizeof(char));
-		if (*(dic->values +i) == NULL) {
-			for (int j = i -1 ;j >=0; j--) {
-				free(*(dic->values + j));
-			}
-			free(dic->values);
-			free(dic->key);
-			free(dic);
-			return NULL;
-		}
-	}
+    for (int i =0; i < MAX_WORD_NUM; i++) {
+        *(dic->values + i) = (char*)malloc(MAX_WORD_SIZE*sizeof(char));
+        if (*(dic->values +i) == NULL) {
+            for (int j = i -1 ;j >=0; j--) {
+                free(*(dic->values + j));
+            }
+            free(dic->values);
+            free(dic->key);
+            free(dic);
+            return NULL;
+        }
+    }
 
-	dic->valnum = 0;
+    dic->valnum = 0;
 
-	dic->next = next;
+    dic->next = next;
 
-	return dic;
+    return dic;
 }
 
 
 void
 dict_deinit(struct dict* dic) {
-	if (dic == NULL ) {
-		return ;
-	}
+    if (dic == NULL ) {
+        return ;
+    }
 
-	/* Although all memory of dict should be freed by dict_deinit(), still check NULL to 
-	 * keep from freeing fialed on a NULL pointer, this appears when somewhere else free
-	 *  memory of dict member and give it NULL out of dict_deinit().
-	 */
-	for (int i = 0; i < MAX_WORD_NUM; i++) {
-		if (*(dic->values + i) == NULL) {
-			continue;
-		}
-		free(*(dic->values +i));
-	}
+    /* Although all memory of dict should be freed by dict_deinit(), still check NULL to 
+     * keep from freeing fialed on a NULL pointer, this appears when somewhere else free
+     *  memory of dict member and give it NULL out of dict_deinit().
+     */
+    for (int i = 0; i < MAX_WORD_NUM; i++) {
+        if (*(dic->values + i) == NULL) {
+            continue;
+        }
+        free(*(dic->values +i));
+    }
 
-	if (dic->values == NULL)
-		return;
-	free(dic->values);
+    if (dic->values == NULL)
+        return;
+    free(dic->values);
 
-	if (dic->key == NULL)
-		return;
-	free(dic->key);
+    if (dic->key == NULL)
+        return;
+    free(dic->key);
 
-	free(dic);
+    free(dic);
 }
 
 
@@ -132,28 +132,28 @@ next: /* go to next line */
 
 char *
 dict_dump(const struct dict *dic, char* buf, size_t size) {
-	char values[MAX_WORD_SIZE*(MAX_WORD_NUM + 1)], *ptmp = values;
+    char values[MAX_WORD_SIZE*(MAX_WORD_NUM + 1)], *ptmp = values;
 
-	memset(buf, 0, size);
-	memset(values, 0, sizeof(values));
+    memset(buf, 0, size);
+    memset(values, 0, sizeof(values));
 
-	for (int i = 0; i < dic->valnum; i++) {
-		strcat(ptmp, *((dic->values) + i));
-		ptmp += strlen(*((dic->values) + i));
+    for (int i = 0; i < dic->valnum; i++) {
+        strcat(ptmp, *((dic->values) + i));
+        ptmp += strlen(*((dic->values) + i));
 
-		if (i != dic->valnum - 1) {
-			strcat(ptmp, ", ");
-			ptmp += strlen(", ");
-		}
-		
-		if (ptmp - values > size - strlen(dic->key) - 14) {
-			break;
-		}
-	}
+        if (i != dic->valnum - 1) {
+            strcat(ptmp, ", ");
+            ptmp += strlen(", ");
+        }
 
-	snprintf(buf, size, "key:%s | value:[%s] | valnum:%d", dic->key, values, dic->valnum);
+        if (ptmp - values > size - strlen(dic->key) - 14) {
+            break;
+        }
+    }
 
-	return buf;
+    snprintf(buf, size, "key:%s | value:[%s] | valnum:%d", dic->key, values, dic->valnum);
+
+    return buf;
 }
 
 
@@ -162,27 +162,27 @@ dict_dump(const struct dict *dic, char* buf, size_t size) {
 int
 main(int argc, char** argv)
 {
-	/* test to_dict */
-	struct dict *dl_test, *dl_test1;
-	dl_test1 = dict_init(NULL);
-	dl_test = dict_init(dl_test1);
-	if (!dl_test || !dl_test1) {
-		printf("error init dict: %s\n", strerror(errno));
-	}
+    /* test to_dict */
+    struct dict *dl_test, *dl_test1;
+    dl_test1 = dict_init(NULL);
+    dl_test = dict_init(dl_test1);
+    if (!dl_test || !dl_test1) {
+        printf("error init dict: %s\n", strerror(errno));
+    }
 
-	int ret = to_dict("host: www.exmple.com zz.com dead.\nservice:mysql web ", dl_test);
-	printf("to_dict ret:%d\n", ret);
-	struct dict *dl = dl_test;
-	char buf_test_dict[MAX_WORD_NUM*MAX_WORD_SIZE];
-	while (dl != NULL) {
-		printf("dict: %s\n", dict_dump(dl, buf_test_dict, sizeof(buf_test_dict)));
-		dl = dl->next;
-	}
+    int ret = to_dict("host: www.exmple.com zz.com dead.\nservice:mysql web ", dl_test);
+    printf("to_dict ret:%d\n", ret);
+    struct dict *dl = dl_test;
+    char buf_test_dict[MAX_WORD_NUM*MAX_WORD_SIZE];
+    while (dl != NULL) {
+        printf("dict: %s\n", dict_dump(dl, buf_test_dict, sizeof(buf_test_dict)));
+        dl = dl->next;
+    }
 
-	dict_deinit(dl_test1);
-	dict_deinit(dl_test);
+    dict_deinit(dl_test1);
+    dict_deinit(dl_test);
 
-    
+
     return 0;
 }
 #endif
