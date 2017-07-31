@@ -59,8 +59,6 @@ get_optsize(int index)
 }
 
 
-
-
 int
 read_server_config(const char* path, struct server_config* sc)
 {
@@ -102,8 +100,8 @@ read_server_config(const char* path, struct server_config* sc)
             else {
                 /* ignore */
             }
+            
             d = d->next;
-
         }
 
         dict_deinit(dlist);
@@ -131,7 +129,6 @@ dump_server_config(struct server_config* sc, char* buf, size_t size)
 int
 main(int argc, char** argv)
 {
-
     /* test read_server_config */
     struct server_config sc;
     if (-1 == read_server_config("./default.conf", &sc)) {
