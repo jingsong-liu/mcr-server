@@ -162,51 +162,6 @@ dict_dump(const struct dict *dic, char* buf, size_t size) {
 }
 
 
-void dictlist_init_head(struct dict *head)
-{
-    head->next = NULL;
-
-}
-
-
-static inline void
-_dictlist_add(struct dict *cur,  struct dict *new)
-{
-    struct dict *tmp = cur->next;
-    cur->next = new;
-    new->next = tmp;
-}
-
-
-
-void diclist_insert(struct dict *cur, struct dict *new)
-{
-    _dictlist_add(cur, new);
-}
-
-
-void dictlist_add_tail(struct dict *head, struct dict *new)
-{
-    struct dict *tail = head;
-    while (tail->next != NULL) {
-        tail = tail->next;
-    }
-    _dictlist_add(tail, new);
-}
-
-
-void dictlist_del_tail(struct dict *head)
-{
-    struct dict *tail = head;
-    struct dict *tail_1 = NULL;
-    while (tail->next != NULL) {
-        tail_1 = tail;
-        tail = tail->next;
-    }
-    tail_1->next = NULL;
-}
-
-
 #ifdef DICT_TEST
 int
 main(int argc, char** argv)
