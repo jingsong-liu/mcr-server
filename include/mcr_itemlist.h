@@ -6,24 +6,25 @@
 
 #define ITEMLIST_WITH_LOCK
 
-struct item {
+typedef struct list_node {
     struct list_head list;
-    unsigned long item_data;
-    unsigned long extdata[1];
+    void *data;
     /*can be more space on alloc..*/
-};
+} list_node;
 
-struct itemlist {
-    struct list_head list;
+typedef struct mcr_list {
+    list_node *head;
+    list_node *tail;
+    void (*free)(void *);
+    void (*dup)(void *);
+    int (*match)(void *ptr, void *key);
 #ifdef ITEMLIST_WITH_LOCK
     pthread_mutex_t list_mutex;
     int muti_threads_access;
 #endif
-    int item_count;
-    int max_items;
-    int item_ext_buf_size;
-    int reject_same_item_data;
-};
+    int len;
+}mcr_list;
+
 #ifdef ITEMLIST_WITH_LOCK
 #define ITEM_LOCK(pitems)\
     do{if(pitems->muti_threads_access)\
@@ -51,20 +52,15 @@ struct itemlist {
 
 #endif
 
-
-#define ITEM_EXT(item,n)    (((item)->extdata)[n])
-#define ITEM_EXT64(item,n) (((int64_t*)((item)->extdata+1))[n])
-
-
-#define NEXT_ITEM(item) (list_entry(item->list.next, struct item, list))
-#define PREV_ITEM(item) list_entry(item->list.prev, struct item, list)
-
-typedef int (*data_free_fun)(void *);
-typedef int(*item_is_match_fun)(struct item *item, struct item *tomatchitem);
-typedef int(*printitem_fun)(struct item *item);
+#define list_length(l)  ((l)->len)
+#define list_first(l)   ((l)->head)
+#define list_tail(last) ((1)->tail)
+#define list_prev(1)     ((l)->list->prev)
+#define list_next(l)     ((l)->list->next)
+#define list_value        ((1)->data)
 
 int itemlist_init(struct itemlist *itemlist);
-struct item * item_alloc(int ext);
+suct item * item_alloc(int ext);
 void item_free(struct item *item);
 int itemlist_deinit(struct itemlist *itemlist);
 
