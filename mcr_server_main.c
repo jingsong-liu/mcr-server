@@ -42,9 +42,7 @@ cli_conn(void* arg) {
         } else if (_s == 0) {
             printf("client closed\n");
             break;    
-        } else {
-            printf("read error: %s\n",  strerror(errno));
-            break;
+        } else { printf("read error: %s\n",  strerror(errno)); break;
         }
         time_t now = time(NULL);
         printf("%s [%s:%d]: %s\n\n", asctime(localtime(&now)), inet_ntoa(cli_addr.sin_addr),
@@ -152,7 +150,7 @@ main(void)
     int server_sock = -1;
     for (ai = ai_list; ai != NULL; ai = ai_list->ai_next) {
         if ((server_sock = server_init(SOCK_STREAM, (struct sockaddr_in*)(ai->ai_addr), config.backlog)) != -1) {
-            // just use first host address
+            // just use the first available host address
             break;
         }
     }
@@ -160,11 +158,11 @@ main(void)
 
     /* try localhost:http */
     if (-1 == server_sock) {
-        printf("host address config seems unavailable, we try to use localhost\n");
+        printf("configured host address config seems unavailable, we try to use localhost\n");
         select_addr_info("localhost", "http", &ai_list);
         for (ai = ai_list; ai != NULL; ai = ai_list->ai_next) {
             if ((server_sock = server_init(SOCK_STREAM, (struct sockaddr_in*)(ai->ai_addr), config.backlog)) != -1) {
-                // just use first host address
+                // just use the first available host address
                 break;
             }
 
@@ -175,7 +173,7 @@ main(void)
 	freeaddrinfo(ai_list);
 
     if (-1 == serve(server_sock)) {
-        printf("server loop exited unexpected, error: %s.", strerror(errno));
+        printf("server loop exited unexpected, error: %s.\n", strerror(errno));
     }
 
     close(server_sock);

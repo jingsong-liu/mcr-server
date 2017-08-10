@@ -73,22 +73,22 @@ read_server_config(const char* path, struct server_config* sc)
     }
 
     char buf[4*1024];
-    //TODO: implement as linklist
-    struct dict *d3 = dict_init(NULL);
-    struct dict *d2 = dict_init(d3);
-    struct dict *d1 = dict_init(d2);
-    struct dict *dlist = dict_init(d1);
-    if (dlist == NULL) { /* d1 | d2 |d3 | == NULL...*/
+    list *dlist = listCreate();
+    if (dlist == NULL) {
         close(fd);
         return -1;
     }
 
     ssize_t len = read(fd, buf, sizeof(buf));
+
     if (len > 0) {
         //parse host and service from buf
         to_dict(buf, dlist);
-        struct dict *d = dlist;
-        while (d != NULL) {
+
+        listIter *li = listGetIterator(dlist, AL_START_HEAD);
+		listNode* node = NULL;
+        while (NULL != (node = listNext(li))) {
+			dict *d = node->value;
             if (!strcmp(get_optname(OPT_HOSTNAME), d->key)) {
                 strncpy(sc->hostname, *(d->values), sizeof(sc->hostname));
             }
@@ -104,17 +104,16 @@ read_server_config(const char* path, struct server_config* sc)
             else {
                 /* ignore */
             }
-            
-            d = d->next;
         }
 
-        // TODO: ...freee list.
-        dict_deinit(dlist); // deinit d1 ,d2, d3, d4 ...
+		listReleaseIterator(li);
+        listEmpty(dlist);
+		listRelease(dlist);
         close(fd);
         return 0;
     }
 
-    dict_deinit(dlist);
+	listRelease(dlist);
     close(fd);
     return -1;
 }

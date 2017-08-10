@@ -7,10 +7,9 @@
 #include "include/mcr_text.h"
 #include "include/mcr_dict.h"
 
-
-struct dict*
-dict_init(struct dict *next) {
-    struct dict *dic = (struct dict*)malloc(sizeof(struct dict));
+dict*
+dict_init(void) {
+    dict *dic = (dict*)malloc(sizeof(dict));
     if (dic == NULL) {
         return NULL;
     }
@@ -43,14 +42,12 @@ dict_init(struct dict *next) {
 
     dic->valnum = 0;
 
-    dic->next = next;
-
     return dic;
 }
 
 
 void
-dict_deinit(struct dict* dic) {
+dict_deinit(dict* dic) {
     if (dic == NULL ) {
         return ;
     }
@@ -79,21 +76,17 @@ dict_deinit(struct dict* dic) {
 
 
 int
-to_dict(char* buf, struct dict *diclist) {
+to_dict(char* buf, list *diclist) {
     char *cl = buf, *nl = buf;
     int n = 0;
-    struct dict *dic = diclist;
+	dict* dic = NULL;
     while (1) {
-        if (dic == NULL || nl == NULL) {
+        if (nl == NULL) {
             break;
         }
 
         int l;
         nl = readline(cl, &l);
-
-        if (nl == NULL) {
-            dic->next = NULL;
-        }
 
         /* line started with '#' is comment */
         if (*cl == '#') {
@@ -116,6 +109,10 @@ to_dict(char* buf, struct dict *diclist) {
             goto next;
         }
 
+		/* memory allocate failed, exit from the rest work. */
+		if (NULL  == (dic = dict_init())) {
+			break;
+		}
         if (1 != to_words(key_area, &(dic->key), 1)) {
             /* number of key isn't 1 should be ingnored. */
             goto next;
@@ -123,7 +120,10 @@ to_dict(char* buf, struct dict *diclist) {
 
         dic->valnum = to_words(values_area, dic->values, MAX_WORD_NUM);
 
-        dic = dic->next;
+		if (NULL == listAddNodeTail(diclist, dic)) {
+			dict_deinit(dic);
+			break;
+		}
 
         n++;
         
@@ -136,7 +136,7 @@ next: /* go to next line */
 
 
 char *
-dict_dump(const struct dict *dic, char* buf, size_t size) {
+dict_dump(const dict *dic, char* buf, size_t size) {
     char values[MAX_WORD_SIZE*(MAX_WORD_NUM + 1)], *ptmp = values;
 
     memset(buf, 0, size);
@@ -167,26 +167,21 @@ int
 main(int argc, char** argv)
 {
     /* test to_dict */
-    struct dict *dl_test, *dl_test1, *dl_test2;
-    dl_test2 = dict_init(NULL);
-    dl_test1 = dict_init(dl_test2);
-    dl_test = dict_init(dl_test1);
-    if (!dl_test || !dl_test1) {
-        printf("error init dict: %s\n", strerror(errno));
-    }
+	list *dlist = listCreate();
+	listNode *node = NULL;	
 
-    int ret = to_dict("host: www.exmple.com zz.com dead.\n#service:mysql web\nPort:8080 8081", dl_test);
+    int ret = to_dict("host: www.exmple.com zz.com dead.\n#service:mysql web\nPort:8080 8081", dlist);
     printf("to_dict ret:%d\n", ret);
-    struct dict *dl = dl_test;
     char buf_test_dict[MAX_WORD_NUM*MAX_WORD_SIZE];
-    while (dl != NULL) {
-        printf("dict: %s\n", dict_dump(dl, buf_test_dict, sizeof(buf_test_dict)));
-        dl = dl->next;
-    }
+	listIter *li = listGetIterator(dlist, AL_START_HEAD);
+	while (NULL != (node = listNext(li))) {
+        printf("dict: %s\n", dict_dump((dict *)node->value, buf_test_dict, sizeof(buf_test_dict)));
+	}
 
-    dict_deinit(dl_test1);
-    dict_deinit(dl_test);
 
+	listEmpty(dlist);
+	listReleaseIterator(li);
+	listRelease(dlist);
 
     return 0;
 }

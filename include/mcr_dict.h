@@ -1,22 +1,23 @@
 #ifndef _MCR_DICT_H
 #define _MCR_DICT_H
-struct dict {
+#include "mcr_list.h"
+
+typedef struct dict {
 	char *key;
 	char **values;
 	int valnum;
-	struct dict *next;
-};
+}dict;
 
-struct dict*
-dict_init(struct dict *next);
+dict*
+dict_init(void);
 
 void
-dict_deinit(struct dict* dic);
+dict_deinit(dict *dic);
 
 int
-to_dict(char* buf, struct dict *diclist);
+to_dict(char* buf, list *diclist);
 
 char *
-dict_dump(const struct dict *dic, char* buf, size_t size);
+dict_dump(const dict *dic, char* buf, size_t size);
 
 #endif
