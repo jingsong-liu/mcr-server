@@ -59,9 +59,9 @@ cli_conn(void* arg) {
 
 
 int
-server_init(int type, struct sockaddr_in* server_addr, int backlog) {
+server_init(int family, int type, struct sockaddr_in* server_addr, int backlog) {
     int sock;
-    sock = socket(AF_INET, type, 0);
+    sock = socket(family, type, 0);
     if (-1 == sock) {
         printf("create socket error: %s\n", strerror(errno));
         goto err1;
@@ -149,7 +149,7 @@ main(void)
 
     int server_sock = -1;
     for (ai = ai_list; ai != NULL; ai = ai_list->ai_next) {
-        if ((server_sock = server_init(SOCK_STREAM, (struct sockaddr_in*)(ai->ai_addr), config.backlog)) != -1) {
+        if ((server_sock = server_init(ai->ai_family, ai->ai_socktype, (struct sockaddr_in*)(ai->ai_addr), config.backlog)) != -1) {
             // just use the first available host address
             break;
         }
@@ -161,7 +161,7 @@ main(void)
         printf("configured host address config seems unavailable, we try to use localhost\n");
         select_addr_info("localhost", "http", &ai_list);
         for (ai = ai_list; ai != NULL; ai = ai_list->ai_next) {
-            if ((server_sock = server_init(SOCK_STREAM, (struct sockaddr_in*)(ai->ai_addr), config.backlog)) != -1) {
+            if ((server_sock = server_init(ai->ai_family, ai->ai_socktype, (struct sockaddr_in*)(ai->ai_addr), config.backlog)) != -1) {
                 // just use the first available host address
                 break;
             }
