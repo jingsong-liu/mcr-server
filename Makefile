@@ -1,5 +1,5 @@
 INCDIR = include
-OBJDIR = obj
+OBJDIR = /tmp
 
 CC=gcc
 CFLAGS= -I$(INCDIR) -Wall
@@ -18,7 +18,7 @@ mcr-server: $(OBJ)
 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)  $(DBG_FLAG)
 
 $(OBJDIR)/%.o: %.c $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS) 
+	$(CC) -c -o $@ $< $(CFLAGS)  ${DBG_FLAG}
 
 .PHONY: clean
 

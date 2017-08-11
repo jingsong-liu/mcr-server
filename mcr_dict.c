@@ -27,10 +27,11 @@ dict_init(void) {
         return NULL;
     }
 
-    for (int i =0; i < MAX_WORD_NUM; i++) {
+	int i, j;
+    for (i =0; i < MAX_WORD_NUM; i++) {
         *(dic->values + i) = (char*)malloc(MAX_WORD_SIZE*sizeof(char));
         if (*(dic->values +i) == NULL) {
-            for (int j = i -1 ;j >=0; j--) {
+            for (j = i -1 ;j >=0; j--) {
                 free(*(dic->values + j));
             }
             free(dic->values);
@@ -56,7 +57,8 @@ dict_deinit(dict* dic) {
      * keep from freeing fialed on a NULL pointer, this appears when somewhere else free
      *  memory of dict member and give it NULL out of dict_deinit().
      */
-    for (int i = 0; i < MAX_WORD_NUM; i++) {
+	int i;
+    for (i = 0; i < MAX_WORD_NUM; i++) {
         if (*(dic->values + i) == NULL) {
             continue;
         }
@@ -138,11 +140,12 @@ next: /* go to next line */
 char *
 dict_dump(const dict *dic, char* buf, size_t size) {
     char values[MAX_WORD_SIZE*(MAX_WORD_NUM + 1)], *ptmp = values;
+	int i;
 
     memset(buf, 0, size);
     memset(values, 0, sizeof(values));
 
-    for (int i = 0; i < dic->valnum; i++) {
+    for (i = 0; i < dic->valnum; i++) {
         strcat(ptmp, *((dic->values) + i));
         ptmp += strlen(*((dic->values) + i));
 

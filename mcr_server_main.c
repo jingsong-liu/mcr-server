@@ -13,9 +13,6 @@
 #include "include/http_parser.h"
 
 
-
-#define DEFAULT_backlog           128
-#define RECEIVE_BUFFER_SIZE     4096
 #define SERVER_CONFIG_FILE      "./default.conf"
 
 struct cli_args {
@@ -32,40 +29,87 @@ typedef struct parser_data {
 } parser_data;
 
 
-int
-mcr_url_callback(http_parser* _, const char *at, size_t length) {
+int mcr_message_begin_callback(http_parser *_) {
+    printf("mcr_message_begin_callback\n");
+    return 0;
+}
+
+
+int mcr_url_callback(http_parser* _, const char *at, size_t length) {
     printf("Url: %.*s\n", (int)length, at);
 
-    char *file_buf = "hello, world!";
-    http_parser_execute(_, NULL, file_buf , strlen(file_buf));
 
-    parser_data *pd = (parser_data *)_->data;
-    if(send(pd->sock, pd->buffer, pd->buf_len, 0) < pd->buf_len ) {
-        printf("send error :%s\n", strerror(errno));
-    }
+    return 0;
+}
 
+
+int mcr_status_callback(http_parser *_, const char *at, size_t length) {
 
     return 0;
 }
 
 
 int mcr_header_filed_callback(http_parser *_, const char *at, size_t length) {
-    printf("header_filed: %.*s\n", (int)length, at);
+    printf("mcr_header_filed_callback: %.*s\n", (int)length, at);
     return 0;
 }
 
+
+int mcr_header_value_callback(http_parser *_, const char *at, size_t length) {
+    printf("mcr_header_value_callback: %.*s\n", (int)length, at);
+
+    return 0;
+}
+
+
+int mcr_headers_complete_callback(http_parser *_) {
+
+    return 0;
+}
+
+
+int mcr_body_callback(http_parser *_, const char *at, size_t length) {
+    printf("mcr_body_callback: %.*s\n", (int)length, at);
+
+    return 0;
+}
+
+
+int mcr_message_complete_callback(http_parser *_) {
+    printf("mcr_message_complete_callback\n");
+
+    return 0;
+}
+
+int mcr_chunk_callback(http_parser *_) {
+
+    return 0;
+}
+
+
+int mcr_chunk_complete_callback(http_parser *_) {
+    return 0;
+}
 
 
 void *
 cli_conn(void* arg) {
     int sock = ((struct cli_args*)arg)->fd;
-    char parsed_buf[80*1024];
+
     parser_data *pd = malloc(sizeof(parser_data));
     pd->sock = sock;
 
     http_parser_settings settings;
+    settings.on_message_begin = mcr_message_begin_callback;
     settings.on_url = mcr_url_callback;
+    settings.on_status = mcr_status_callback;
     settings.on_header_field = mcr_header_filed_callback;
+    settings.on_headers_complete = mcr_headers_complete_callback;
+    settings.on_body = mcr_body_callback;
+    settings.on_message_complete = mcr_message_complete_callback;
+    settings.on_chunk_header = mcr_chunk_callback;
+    settings.on_chunk_complete = mcr_chunk_complete_callback;
+    
 
     http_parser *parser = malloc(sizeof(http_parser));
     if (parser == NULL) {
@@ -98,8 +142,12 @@ cli_conn(void* arg) {
                 /* new protocol */
 
             } else if (nparsed != recved) {
+                printf("http parsed failed\n");
                 break;
             } else {
+   
+                printf("request method:%s \n", http_method_str(parser->method));
+               // if (parser->method
                 /* response */
 
             }
@@ -119,6 +167,11 @@ server_init(int family, int type, struct sockaddr_in* server_addr, int backlog) 
     if (-1 == sock) {
         printf("create socket error: %s\n", strerror(errno));
         goto err1;
+    }
+    
+    int optval = 1;
+    if (-1 ==  setsockopt(sock, SOL_SOCKET , SO_REUSEADDR, &optval, sizeof(optval))) {
+        printf("set reuse addr failed: %s\n", strerror(errno));
     }
 
     if (0 != bind(sock, (struct sockaddr *)server_addr, sizeof(struct sockaddr_in))) {
