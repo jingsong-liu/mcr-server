@@ -10,6 +10,7 @@
 #include <pthread.h>
 #include <netdb.h>
 #include "include/mcr_server_config.h"
+#include "include/http_parser.h"
 
 
 
@@ -23,37 +24,90 @@ struct cli_args {
 };
 
 
+
+typedef struct parser_data {
+    int sock;
+    void *buffer;
+    int buf_len;
+} parser_data;
+
+
+int
+mcr_url_callback(http_parser* _, const char *at, size_t length) {
+    printf("Url: %.*s\n", (int)length, at);
+
+    char *file_buf = "hello, world!";
+    http_parser_execute(_, NULL, file_buf , strlen(file_buf));
+
+    parser_data *pd = (parser_data *)_->data;
+    if(send(pd->sock, pd->buffer, pd->buf_len, 0) < pd->buf_len ) {
+        printf("send error :%s\n", strerror(errno));
+    }
+
+
+    return 0;
+}
+
+
+int mcr_header_filed_callback(http_parser *_, const char *at, size_t length) {
+    printf("header_filed: %.*s\n", (int)length, at);
+    return 0;
+}
+
+
+
 void *
 cli_conn(void* arg) {
-    char buf[RECEIVE_BUFFER_SIZE];
-    int fd = ((struct cli_args*)arg)->fd;
-    struct sockaddr_in cli_addr ;
-    int cliaddr_len = sizeof(cli_addr);
-    if (-1 == getpeername(fd, (struct sockaddr*)&cli_addr, (socklen_t*)&cliaddr_len)) {
-        printf("get peer name error: %s\n", strerror(errno));
-    }
+    int sock = ((struct cli_args*)arg)->fd;
+    char parsed_buf[80*1024];
+    parser_data *pd = malloc(sizeof(parser_data));
+    pd->sock = sock;
 
-    printf("create thread for client from %s\n", inet_ntoa(cli_addr.sin_addr));
+    http_parser_settings settings;
+    settings.on_url = mcr_url_callback;
+    settings.on_header_field = mcr_header_filed_callback;
+
+    http_parser *parser = malloc(sizeof(http_parser));
+    if (parser == NULL) {
+        printf("creat http parser error:%s\n", strerror(errno));
+        close(sock);
+        pthread_exit(0);
+    }
+    http_parser_init(parser, HTTP_BOTH);
+    parser->data = pd;
+
+    size_t http_len = 80*1024, nparsed;
+    char http_buf[http_len];
+    ssize_t recved;
     while(1)
     {
-        ssize_t _s = read(fd, buf, sizeof(buf));
-        if (_s > 0) {
-            buf[_s-1] = '\0';
-        } else if (_s == 0) {
+        recved = recv(sock, http_buf, sizeof(http_buf), 0);
+        if (recved < 0) {
+            printf("read error: %s\n",  strerror(errno)); break;
+
+        } else if (recved == 0) {
+            /* peer closed */
             printf("client closed\n");
             break;    
-        } else { printf("read error: %s\n",  strerror(errno)); break;
-        }
-        time_t now = time(NULL);
-        printf("%s [%s:%d]: %s\n\n", asctime(localtime(&now)), inet_ntoa(cli_addr.sin_addr),
-         ntohs(cli_addr.sin_port), buf);
 
-        if (-1 == write(fd, buf, strlen(buf))) {
-            printf("write back error: %s\n", strerror(errno));
-            break;
+        } else {
+
+            nparsed = http_parser_execute(parser, &settings, http_buf, recved);
+
+            if (parser->upgrade) {
+                /* new protocol */
+
+            } else if (nparsed != recved) {
+                break;
+            } else {
+                /* response */
+
+            }
+
         }
     }
-    close(fd);
+
+    close(sock);
     pthread_exit(0);
 }
 
@@ -108,7 +162,8 @@ serve(int server_sock)
             printf("create pthread error: %s\n", strerror(errno));
             return -1;
         }
-        //pthread_detach(pid);
+
+        pthread_detach(pid);
     }
 
     //cloase child thread?
