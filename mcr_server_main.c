@@ -92,11 +92,139 @@ int mcr_chunk_complete_callback(http_parser *_) {
 }
 
 
+char *
+mcr_http_protocal(char *buf) {
+    char *HTTP = "HTTP/";
+    strcat(buf, HTTP);
+    return buf;
+}
+
+
+char *
+mcr_http_version(const char *version, char *buf) {
+    strcat(buf, version);
+    strcat(buf, " ");
+
+    return buf;
+    
+}
+
+
+char*
+mcr_http_status(int status_code, char *buf) {
+    char numstr[8];
+    memset(numstr, 0, sizeof(numstr));
+    itoa(status_code, numstr, 10);
+    strcat(buf, numstr);
+    strcat(buf, " ");
+    return buf;
+
+}
+    
+    
+char *
+mcr_http_errno(int errno, char *buf) {
+    char numstr[8]; 
+    itoa(errno, numstr, 10);
+    strcat(buf, numstr);
+    strcat(buf, " ");
+}
+
+
+char *
+mcr_http_newline(char *buf) {
+    strcat(buf, "\r\n");
+    return buf;
+}
+
+
+char *
+mcr_http_servername (const char * servername, char *buf) {
+    char *serverfield = "Server: ";
+    strcat(buf, serverfield);
+    strcat(buf, servername);
+    return buf;
+}
+
+
+char *
+mcr_http_content_len(int conten_len, char *buf) {
+    char numstr[8];
+    memset(numstr, 0, sizeof(numstr));
+    itoa(conten_len, numstr, 10);
+    strcat(buf, numstr);
+    strcat(buf, " ");
+    return buf;
+}
+
+
+char *
+mcr_http_content_type(const char *content_type, char *buf) {
+    strcat(buf, "Content-type: ");
+    strcat(buf, content_type);
+    return buf;
+}
+
+
+char *mcr_http_body(const char *msg, char *buf) {
+        strcat(buf, msg);
+    return buf;
+}
+
+
+#define SERVER_NAME "mcr-server"
+#define DEFAULT_HTTP_VERSION "1.1"
+
+
+char *
+mcr_make_http_reponse(int status_code, int errno, const char *msg, const char *content_type,  const char *version, char *buf) {
+    /* protocal line */
+    mcr_http_protocal(buf);
+    if (version == NULL ) {
+        mcr_http_version(DEFAULT_HTTP_VERSION, buf);
+    }
+    else {
+        mcr_http_version(version, buf);
+    }
+    mcr_http_status(status_code, buf);
+    mcr_http_errno(errno, buf);
+    mcr_http_newline(buf);
+
+    /* server line */
+    mcr_http_servername(SERVER_NAME, buf);
+    mcr_http_newline(buf);
+    
+    /* content-len */
+    mcr_http_content_len(2048, buf);
+    mcr_http_newline(buf);
+
+    /* content-type */
+    if (content_type == NULL) {
+       mcr_http_content_type("text/html;charset=utf-8", buf);   //this should be read from file
+    }
+    else {
+       mcr_http_content_type(content_type, buf);
+    }
+
+    mcr_http_newline(buf);
+    mcr_http_newline(buf);
+
+    /* content-body */
+    mcr_http_body(msg, buf);
+
+    return buf;
+
+}
+    
+
 void *
 cli_conn(void* arg) {
     int sock = ((struct cli_args*)arg)->fd;
 
     parser_data *pd = malloc(sizeof(parser_data));
+    if (pd == NULL) {
+        goto err1;
+    }
     pd->sock = sock;
 
     http_parser_settings settings;
@@ -114,14 +242,16 @@ cli_conn(void* arg) {
     http_parser *parser = malloc(sizeof(http_parser));
     if (parser == NULL) {
         printf("creat http parser error:%s\n", strerror(errno));
-        close(sock);
-        pthread_exit(0);
+        goto err2;
     }
     http_parser_init(parser, HTTP_BOTH);
     parser->data = pd;
 
     size_t http_len = 80*1024, nparsed;
-    char http_buf[http_len];
+    char *http_buf = malloc(http_len*sizeof(char));
+    if (http_buf == NULL) {
+        goto err3;
+    }
     ssize_t recved;
     while(1)
     {
@@ -139,27 +269,33 @@ cli_conn(void* arg) {
             nparsed = http_parser_execute(parser, &settings, http_buf, recved);
 
             if (parser->upgrade) {
-                /* new protocol */
+                /* websocket */
 
             } else if (nparsed != recved) {
                 printf("http parsed failed\n");
                 break;
+
             } else {
-   
                 printf("request method:%s \n", http_method_str(parser->method));
-               // if (parser->method
                 /* response */
 
+               char buf[2048];
+                mcr_make_http_reponse(200, 0, "hello, Mr.liu!", NULL, NULL, buf);
             }
 
         }
     }
 
+
+   free(http_buf);
+err3:
+   free(parser);
+err2:
+    free(pd);
+err1:
     close(sock);
     pthread_exit(0);
-}
-
-
+}    
 int
 server_init(int family, int type, struct sockaddr_in* server_addr, int backlog) {
     int sock;
