@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <fcntl.h>
 #include <netdb.h>
 #include "include/mcr_server_config.h"
 #include "include/http_parser.h"
@@ -35,6 +36,11 @@ int mcr_message_begin_callback(http_parser *_) {
 }
 
 
+char *
+mcr_make_http_reponse(int status_code, int errnum, const char *msg, const char *content_type,  const char *version, char *buf);
+
+
+
 int mcr_url_callback(http_parser* _, const char *at, size_t length) {
     printf("Url: %.*s\n", (int)length, at);
 
@@ -50,20 +56,17 @@ int mcr_status_callback(http_parser *_, const char *at, size_t length) {
 
 
 int mcr_header_filed_callback(http_parser *_, const char *at, size_t length) {
-    printf("mcr_header_filed_callback: %.*s\n", (int)length, at);
     return 0;
 }
 
 
 int mcr_header_value_callback(http_parser *_, const char *at, size_t length) {
-    printf("mcr_header_value_callback: %.*s\n", (int)length, at);
 
     return 0;
 }
 
 
 int mcr_headers_complete_callback(http_parser *_) {
-
     return 0;
 }
 
@@ -76,18 +79,34 @@ int mcr_body_callback(http_parser *_, const char *at, size_t length) {
 
 
 int mcr_message_complete_callback(http_parser *_) {
-    printf("mcr_message_complete_callback\n");
+    parser_data *pd = (parser_data *)_->data;
+    char msg_buffer[2048];
+    int msg_len = 0;
+
+    int fd = open("index.html", O_RDONLY);
+    if (fd > 0 )  {
+        msg_len = read(fd, msg_buffer, 2048);
+    }
+
+    if (msg_len > 0) {
+        mcr_make_http_reponse(200, 0, msg_buffer, NULL, NULL, pd->buffer);
+        pd->buf_len = strlen(pd->buffer) + 1;
+        send(pd->sock, pd->buffer, pd->buf_len, 0);
+    }
+
+    close(fd);
 
     return 0;
 }
 
 int mcr_chunk_callback(http_parser *_) {
-
+    printf("mcr_chunk_callback\n");
     return 0;
 }
 
 
 int mcr_chunk_complete_callback(http_parser *_) {
+    printf("mcr_chunk_complete_callback\n");
     return 0;
 }
 
@@ -95,7 +114,7 @@ int mcr_chunk_complete_callback(http_parser *_) {
 char *
 mcr_http_protocal(char *buf) {
     char *HTTP = "HTTP/";
-    strcat(buf, HTTP);
+    strcpy(buf, HTTP);
     return buf;
 }
 
@@ -113,21 +132,19 @@ mcr_http_version(const char *version, char *buf) {
 char*
 mcr_http_status(int status_code, char *buf) {
     char numstr[8];
-    memset(numstr, 0, sizeof(numstr));
-    itoa(status_code, numstr, 10);
+    snprintf(numstr, sizeof(numstr), "%d ", status_code);;
     strcat(buf, numstr);
-    strcat(buf, " ");
     return buf;
 
 }
     
     
 char *
-mcr_http_errno(int errno, char *buf) {
+mcr_http_errno(int errnum, char *buf) {
     char numstr[8]; 
-    itoa(errno, numstr, 10);
+    snprintf(numstr, sizeof(numstr), "%d ", errnum);;
     strcat(buf, numstr);
-    strcat(buf, " ");
+    return buf;
 }
 
 
@@ -148,19 +165,18 @@ mcr_http_servername (const char * servername, char *buf) {
 
 
 char *
-mcr_http_content_len(int conten_len, char *buf) {
+mcr_http_content_lenth(int content_len, char *buf) {
     char numstr[8];
-    memset(numstr, 0, sizeof(numstr));
-    itoa(conten_len, numstr, 10);
+    snprintf(numstr, sizeof(numstr), "%d ", content_len);;
+    strcat(buf, "Content-Length: ");
     strcat(buf, numstr);
-    strcat(buf, " ");
     return buf;
 }
 
 
 char *
 mcr_http_content_type(const char *content_type, char *buf) {
-    strcat(buf, "Content-type: ");
+    strcat(buf, "Content-Type: ");
     strcat(buf, content_type);
     return buf;
 }
@@ -177,7 +193,7 @@ char *mcr_http_body(const char *msg, char *buf) {
 
 
 char *
-mcr_make_http_reponse(int status_code, int errno, const char *msg, const char *content_type,  const char *version, char *buf) {
+mcr_make_http_reponse(int status_code, int errnum, const char *msg, const char *content_type,  const char *version, char *buf) {
     /* protocal line */
     mcr_http_protocal(buf);
     if (version == NULL ) {
@@ -187,7 +203,7 @@ mcr_make_http_reponse(int status_code, int errno, const char *msg, const char *c
         mcr_http_version(version, buf);
     }
     mcr_http_status(status_code, buf);
-    mcr_http_errno(errno, buf);
+    mcr_http_errno(errnum, buf);
     mcr_http_newline(buf);
 
     /* server line */
@@ -195,7 +211,7 @@ mcr_make_http_reponse(int status_code, int errno, const char *msg, const char *c
     mcr_http_newline(buf);
     
     /* content-len */
-    mcr_http_content_len(2048, buf);
+    mcr_http_content_lenth(2048, buf);
     mcr_http_newline(buf);
 
     /* content-type */
@@ -226,12 +242,15 @@ cli_conn(void* arg) {
         goto err1;
     }
     pd->sock = sock;
+    pd->buffer = malloc(2*2048*sizeof(char));
+    pd->buf_len = 2*2048;
 
     http_parser_settings settings;
     settings.on_message_begin = mcr_message_begin_callback;
     settings.on_url = mcr_url_callback;
     settings.on_status = mcr_status_callback;
     settings.on_header_field = mcr_header_filed_callback;
+    settings.on_header_value = mcr_header_value_callback;
     settings.on_headers_complete = mcr_headers_complete_callback;
     settings.on_body = mcr_body_callback;
     settings.on_message_complete = mcr_message_complete_callback;
@@ -244,7 +263,7 @@ cli_conn(void* arg) {
         printf("creat http parser error:%s\n", strerror(errno));
         goto err2;
     }
-    http_parser_init(parser, HTTP_BOTH);
+    http_parser_init(parser, HTTP_REQUEST);
     parser->data = pd;
 
     size_t http_len = 80*1024, nparsed;
@@ -259,11 +278,6 @@ cli_conn(void* arg) {
         if (recved < 0) {
             printf("read error: %s\n",  strerror(errno)); break;
 
-        } else if (recved == 0) {
-            /* peer closed */
-            printf("client closed\n");
-            break;    
-
         } else {
 
             nparsed = http_parser_execute(parser, &settings, http_buf, recved);
@@ -276,11 +290,9 @@ cli_conn(void* arg) {
                 break;
 
             } else {
-                printf("request method:%s \n", http_method_str(parser->method));
+//                printf("request method:%s \n", http_method_str(parser->method));
                 /* response */
 
-               char buf[2048];
-                mcr_make_http_reponse(200, 0, "hello, Mr.liu!", NULL, NULL, buf);
             }
 
         }
@@ -382,7 +394,6 @@ select_addr_info(char* hostname, char* service, struct addrinfo** ai_list) {
 int
 main(void)
 {
-
     struct server_config config;
     if ( -1 == read_server_config(SERVER_CONFIG_FILE, &config)) {
         printf("error read_server_config :%s\n", strerror(errno));
