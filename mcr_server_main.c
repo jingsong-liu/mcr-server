@@ -11,8 +11,7 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include "include/mcr_server_config.h"
-#include "include/http_parser.h"
-
+#include "include/mcr_http.h"
 
 #define SERVER_CONFIG_FILE      "./default.conf"
 
@@ -22,292 +21,47 @@ struct cli_args {
 };
 
 
-
-typedef struct parser_data {
-    int sock;
-    void *buffer;
-    int buf_len;
-} parser_data;
-
-
-int mcr_message_begin_callback(http_parser *_) {
-    printf("mcr_message_begin_callback\n");
-    return 0;
-}
-
-
-char *
-mcr_make_http_reponse(int status_code, int errnum, const char *msg, const char *content_type,  const char *version, char *buf);
-
-
-
-int mcr_url_callback(http_parser* _, const char *at, size_t length) {
-    printf("Url: %.*s\n", (int)length, at);
-
-
-    return 0;
-}
-
-
-int mcr_status_callback(http_parser *_, const char *at, size_t length) {
-
-    return 0;
-}
-
-
-int mcr_header_filed_callback(http_parser *_, const char *at, size_t length) {
-    return 0;
-}
-
-
-int mcr_header_value_callback(http_parser *_, const char *at, size_t length) {
-
-    return 0;
-}
-
-
-int mcr_headers_complete_callback(http_parser *_) {
-    return 0;
-}
-
-
-int mcr_body_callback(http_parser *_, const char *at, size_t length) {
-    printf("mcr_body_callback: %.*s\n", (int)length, at);
-
-    return 0;
-}
-
-
-int mcr_message_complete_callback(http_parser *_) {
-    parser_data *pd = (parser_data *)_->data;
-    char msg_buffer[2048];
-    int msg_len = 0;
-
-    int fd = open("index.html", O_RDONLY);
-    if (fd > 0 )  {
-        msg_len = read(fd, msg_buffer, 2048);
-    }
-
-    if (msg_len > 0) {
-        mcr_make_http_reponse(200, 0, msg_buffer, NULL, NULL, pd->buffer);
-        pd->buf_len = strlen(pd->buffer) + 1;
-        send(pd->sock, pd->buffer, pd->buf_len, 0);
-    }
-
-    close(fd);
-
-    return 0;
-}
-
-int mcr_chunk_callback(http_parser *_) {
-    printf("mcr_chunk_callback\n");
-    return 0;
-}
-
-
-int mcr_chunk_complete_callback(http_parser *_) {
-    printf("mcr_chunk_complete_callback\n");
-    return 0;
-}
-
-
-char *
-mcr_http_protocal(char *buf) {
-    char *HTTP = "HTTP/";
-    strcpy(buf, HTTP);
-    return buf;
-}
-
-
-char *
-mcr_http_version(const char *version, char *buf) {
-    strcat(buf, version);
-    strcat(buf, " ");
-
-    return buf;
-    
-}
-
-
-char*
-mcr_http_status(int status_code, char *buf) {
-    char numstr[8];
-    snprintf(numstr, sizeof(numstr), "%d ", status_code);;
-    strcat(buf, numstr);
-    return buf;
-
-}
-    
-    
-char *
-mcr_http_errno(int errnum, char *buf) {
-    char numstr[8]; 
-    snprintf(numstr, sizeof(numstr), "%d ", errnum);;
-    strcat(buf, numstr);
-    return buf;
-}
-
-
-char *
-mcr_http_newline(char *buf) {
-    strcat(buf, "\r\n");
-    return buf;
-}
-
-
-char *
-mcr_http_servername (const char * servername, char *buf) {
-    char *serverfield = "Server: ";
-    strcat(buf, serverfield);
-    strcat(buf, servername);
-    return buf;
-}
-
-
-char *
-mcr_http_content_lenth(int content_len, char *buf) {
-    char numstr[8];
-    snprintf(numstr, sizeof(numstr), "%d ", content_len);;
-    strcat(buf, "Content-Length: ");
-    strcat(buf, numstr);
-    return buf;
-}
-
-
-char *
-mcr_http_content_type(const char *content_type, char *buf) {
-    strcat(buf, "Content-Type: ");
-    strcat(buf, content_type);
-    return buf;
-}
-
-
-char *mcr_http_body(const char *msg, char *buf) {
-        strcat(buf, msg);
-    return buf;
-}
-
-
-#define SERVER_NAME "mcr-server"
-#define DEFAULT_HTTP_VERSION "1.1"
-
-
-char *
-mcr_make_http_reponse(int status_code, int errnum, const char *msg, const char *content_type,  const char *version, char *buf) {
-    /* protocal line */
-    mcr_http_protocal(buf);
-    if (version == NULL ) {
-        mcr_http_version(DEFAULT_HTTP_VERSION, buf);
-    }
-    else {
-        mcr_http_version(version, buf);
-    }
-    mcr_http_status(status_code, buf);
-    mcr_http_errno(errnum, buf);
-    mcr_http_newline(buf);
-
-    /* server line */
-    mcr_http_servername(SERVER_NAME, buf);
-    mcr_http_newline(buf);
-    
-    /* content-len */
-    mcr_http_content_lenth(2048, buf);
-    mcr_http_newline(buf);
-
-    /* content-type */
-    if (content_type == NULL) {
-       mcr_http_content_type("text/html;charset=utf-8", buf);   //this should be read from file
-    }
-    else {
-       mcr_http_content_type(content_type, buf);
-    }
-
-    mcr_http_newline(buf);
-    mcr_http_newline(buf);
-
-    /* content-body */
-    mcr_http_body(msg, buf);
-
-    return buf;
-
-}
-    
-
 void *
 cli_conn(void* arg) {
     int sock = ((struct cli_args*)arg)->fd;
-
-    parser_data *pd = malloc(sizeof(parser_data));
-    if (pd == NULL) {
-        goto err1;
-    }
-    pd->sock = sock;
-    pd->buffer = malloc(2*2048*sizeof(char));
-    pd->buf_len = 2*2048;
-
-    http_parser_settings settings;
-    settings.on_message_begin = mcr_message_begin_callback;
-    settings.on_url = mcr_url_callback;
-    settings.on_status = mcr_status_callback;
-    settings.on_header_field = mcr_header_filed_callback;
-    settings.on_header_value = mcr_header_value_callback;
-    settings.on_headers_complete = mcr_headers_complete_callback;
-    settings.on_body = mcr_body_callback;
-    settings.on_message_complete = mcr_message_complete_callback;
-    settings.on_chunk_header = mcr_chunk_callback;
-    settings.on_chunk_complete = mcr_chunk_complete_callback;
-    
-
-    http_parser *parser = malloc(sizeof(http_parser));
-    if (parser == NULL) {
-        printf("creat http parser error:%s\n", strerror(errno));
-        goto err2;
-    }
-    http_parser_init(parser, HTTP_REQUEST);
-    parser->data = pd;
-
-    size_t http_len = 80*1024, nparsed;
-    char *http_buf = malloc(http_len*sizeof(char));
-    if (http_buf == NULL) {
-        goto err3;
+    size_t recv_buflen = 80*1024, nparsed;
+    char *recv_buf = malloc(recv_buflen*sizeof(char));
+    if (recv_buf == NULL) {
+        goto out;
     }
     ssize_t recved;
+
+    mcr_http mhttp = mcr_make_http();
+    if (mhttp == NULL) {
+        free(rev_buf);
+        goto out;
+    }
+
+    mhttp->attach(sock, rec_buf, &recved);
+
     while(1)
     {
-        recved = recv(sock, http_buf, sizeof(http_buf), 0);
+        recved = recv(sock, recv_buf, sizeof(recv_buf), 0);
         if (recved < 0) {
-            printf("read error: %s\n",  strerror(errno)); break;
+            printf("read error: %s\n",  strerror(errno)); 
+            break;
 
         } else {
-
-            nparsed = http_parser_execute(parser, &settings, http_buf, recved);
-
-            if (parser->upgrade) {
-                /* websocket */
-
-            } else if (nparsed != recved) {
-                printf("http parsed failed\n");
-                break;
-
-            } else {
-//                printf("request method:%s \n", http_method_str(parser->method));
-                /* response */
-
-            }
+            /* do parse in the loop, or in event handler */
+            mhttp->parse();
 
         }
     }
 
+    free(rec_buf);
+    mcr_free_http(mhttp);
 
-   free(http_buf);
-err3:
-   free(parser);
-err2:
-    free(pd);
-err1:
+out:
     close(sock);
     pthread_exit(0);
-}    
+}
+
+
 int
 server_init(int family, int type, struct sockaddr_in* server_addr, int backlog) {
     int sock;
