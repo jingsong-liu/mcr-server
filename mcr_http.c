@@ -1,39 +1,84 @@
 #include <stdio.h>
+#include <sys/socket.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
 #include "include/mcr_http.h"
 
-parser_data *
-mcr_make_parser_data(int sock, size_t buf_len)
+int mcr_message_begin_callback(http_parser *_);
+char *
+mcr_make_http_reponse(int status_code, int errnum, const char *msg, const char *content_type,  const char *version, char *buf);
+
+
+
+#define SERVER_NAME "mcr-server"
+#define DEFAULT_HTTP_VERSION "1.1"
+int mcr_url_callback(http_parser* _, const char *at, size_t length);
+int mcr_status_callback(http_parser *_, const char *at, size_t length);
+int mcr_header_filed_callback(http_parser *_, const char *at, size_t length);
+int mcr_header_value_callback(http_parser *_, const char *at, size_t length);
+int mcr_headers_complete_callback(http_parser *_);
+int mcr_body_callback(http_parser *_, const char *at, size_t length);;;;
+int mcr_message_complete_callback(http_parser *_);
+int mcr_chunk_callback(http_parser *_);
+int mcr_chunk_complete_callback(http_parser *_);
+char *
+mcr_http_protocal(char *buf);
+char *
+mcr_http_version(const char *version, char *buf);
+char*
+mcr_http_status(int status_code, char *buf);
+char *
+mcr_http_errno(int errnum, char *buf);
+
+char *
+mcr_http_newline(char *buf);
+char *
+mcr_http_servername (const char * servername, char *buf);
+char *
+mcr_http_content_lenth(int content_len, char *buf);
+char *
+mcr_http_content_type(const char *content_type, char *buf);
+char *
+mcr_http_body(const char *msg, char *buf); 
+char *
+mcr_make_http_reponse(int status_code, int errnum, const char *msg, const char *content_type,  const char *version, char *buf);
+
+
+http_context *
+mcr_make_http_context(int *sock, size_t buf_len)
 {
-    parser_data *pd = malloc(sizeof(parser_data));
-    if (pd == NULL) {
-        return NULL;
-    }
-    pd->sock = sock;
-    pd->buffer = malloc(buf_len*sizeof(char));
-    if (pd->buffer == NULL) {
-        free(pd)
+    http_context *pcontext = malloc(sizeof(http_context));
+    if (pcontext == NULL) {
         return NULL;
     }
 
-    pd->buf_len = buf_len;
-    return pd;
+    pcontext->sock = sock;
+    pcontext->buffer = malloc(buf_len*sizeof(char));
+    if (pcontext->buffer == NULL) {
+        free(pcontext);
+        return NULL;
+    }
+
+    pcontext->buf_len = buf_len;
+    return pcontext;
 }
 
 
 void
-mcr_free_parser_data(parser_data *pd)
+mcr_free_http_context(http_context *pcontext)
 {
-    if (pd == NULL) {
+    if (pcontext == NULL) {
         return ;
     }
 
-    if (pd->buffer != NULL ) {
-        free(pd->buffer);
+    if (pcontext->buffer != NULL ) {
+        free(pcontext->buffer);
     }
 
-    free(pd);
+    free(pcontext);
 }
-
 
 
 http_parser *
@@ -58,7 +103,6 @@ mcr_free_http_parser(http_parser *hp)
     if (hp == NULL)
         return;
 
-    mcr_free_parser_data(hp->data);
     free(hp);
 }
 
@@ -82,17 +126,64 @@ mcr_make_http_hook()
     settings->on_message_complete = mcr_message_complete_callback;
     settings->on_chunk_header = mcr_chunk_callback;
     settings->on_chunk_complete = mcr_chunk_complete_callback;
+
+    return settings;
 }
     
 
 void
-mcr_free_http_hook()
+mcr_free_http_hook(http_parser_settings *settings)
 {
-    if (http_parser_settings *settings != NULL) {
+    if (settings != NULL) {
         free(settings);
     }
 }
 
+
+/*
+ * make http object and register it to recv loop or event handler
+ */
+
+void
+mcr_register_http(mcr_http *mhttp, int sock, char *input, int *input_len)
+{
+    mhttp->sock = sock;
+    mhttp->input = input;
+    mhttp->input_len = input_len;
+}
+
+
+void
+mcr_unregister_http(mcr_http *mhttp)
+{
+    mhttp->sock = -1;
+    mhttp->input = NULL;
+    mhttp->input_len = 0;
+}
+
+
+int
+mcr_http_parse(mcr_http *mhttp)
+{
+    int nparsed;
+
+    nparsed = http_parser_execute(mhttp->parser, mhttp->hooks, mhttp->input, *(mhttp->input_len));
+
+    if (mhttp->parser->upgrade) {
+        /* websocket */
+
+    } else if (nparsed != *(mhttp->input_len)) {
+        printf("http parsed failed\n");
+
+    } else {
+        if (nparsed == 0) ;
+        //printf("request method:%s \n", http_method_str(parser->method));
+        /* response */
+
+    }
+
+    return 0;
+}
 
 
 mcr_http *
@@ -103,27 +194,27 @@ mcr_make_http()
         return NULL;
     }
 
-    parser_data *pd = mcr_make_parser_data(&(mcr_http->sock), 1024);
-    if (pd == NULL) {
+    http_context *pcontext = mcr_make_http_context(&(mhttp->sock), 1024);
+    if (pcontext == NULL) {
         mcr_free_http(mhttp);
         return NULL;
     }
-    mhttp->context = pd;
+    mhttp->context = pcontext;
 
     http_parser* hp = mcr_make_http_parser();
     if (hp == NULL) {
         mcr_free_http(mhttp);
-        mcr_free_parser_data();
+        mcr_free_http_context(pcontext);
         return NULL;
     }
-    hp->data = pd;
+    hp->data = pcontext;
     mhttp->parser = hp;
 
     http_parser_settings *hooks= mcr_make_http_hook();
     if (hooks == NULL) {
         mcr_free_http(mhttp);
-        mcr_free_parser_data();
-        mcr_free_http_parser();
+        mcr_free_http_context(pcontext);
+        mcr_free_http_parser(hp);
         return NULL;
     }
     mhttp->hooks = hooks;
@@ -131,7 +222,7 @@ mcr_make_http()
     mhttp->attach = mcr_register_http;
     mhttp->unattach = mcr_unregister_http;
     mhttp->parse = mcr_http_parse;
-    return mcr_http;
+    return mhttp;
 }
 
 
@@ -142,7 +233,7 @@ mcr_free_http(mcr_http *mhttp)
         return;
 
     if (mhttp->context)
-        mcr_free_parser_data(mhttp->context);
+        mcr_free_http_context(mhttp->context);
     if (mhttp->parser)
         mcr_free_http_parser(mhttp->parser);
     if(mhttp->hooks)
@@ -150,57 +241,6 @@ mcr_free_http(mcr_http *mhttp)
     
     free(mhttp);
 }
-
-
-/*
- * make http object and register it to recv/eventloop.
- */
-
-void
-mcr_register_http( int sock, char *inputm, int *input_len)
-{
-    mcr_http *mhttp = containof();
-    mhttp->sock = sock;
-    mhttp->input = input;
-    mhttp->input_len = input_len;
-}
-
-
-void
-mcr_unregister_http()
-{
-    mcr_http *mhttp = containof();
-    mhttp->sock = -1;
-    mhttp->input = NULL;
-    mhttp->input_len = 0;
-}
-
-
-int
-mcr_http_parse()
-{
-    int nparsed;
-    mcr_http * mhttp = containof();
-
-    nparsed = http_parser_execute(mhttp->parser, mhttp->hooks, mhttp->input, *(mhttp->input_len));
-
-    if (mhttp->parser->upgrade) {
-        /* websocket */
-
-    } else if (nparsed != recved) {
-        printf("http parsed failed\n");
-        break;
-
-    } else {
-        if (nparsed == 0) break;
-        //printf("request method:%s \n", http_method_str(parser->method));
-        /* response */
-
-    }
-
-    return 0;
-}
-
 
 int mcr_message_begin_callback(http_parser *_)
 {
@@ -251,7 +291,7 @@ int mcr_body_callback(http_parser *_, const char *at, size_t length) {
 
 
 int mcr_message_complete_callback(http_parser *_) {
-    parser_data *pd = (parser_data *)_->data;
+    http_context *pcontext = (http_context *)_->data;
     char msg_buffer[2048];
     int msg_len = 0;
 
@@ -261,9 +301,9 @@ int mcr_message_complete_callback(http_parser *_) {
     }
 
     if (msg_len > 0) {
-        mcr_make_http_reponse(200, 0, msg_buffer, NULL, NULL, pd->buffer);
-        pd->buf_len = strlen(pd->buffer) + 1;
-        send(pd->sock, pd->buffer, pd->buf_len, 0);
+        mcr_make_http_reponse(200, 0, msg_buffer, NULL, NULL, pcontext->buffer);
+        pcontext->buf_len = strlen(pcontext->buffer) + 1;
+        send(*pcontext->sock, pcontext->buffer, pcontext->buf_len, 0);
     }
 
     close(fd);

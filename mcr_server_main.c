@@ -31,13 +31,13 @@ cli_conn(void* arg) {
     }
     ssize_t recved;
 
-    mcr_http mhttp = mcr_make_http();
+    mcr_http *mhttp = mcr_make_http();
     if (mhttp == NULL) {
-        free(rev_buf);
+        free(recv_buf);
         goto out;
     }
 
-    mhttp->attach(sock, rec_buf, &recved);
+    mhttp->attach(mhttp, sock, recv_buf, &recved);
 
     while(1)
     {
@@ -48,12 +48,12 @@ cli_conn(void* arg) {
 
         } else {
             /* do parse in the loop, or in event handler */
-            mhttp->parse();
+            mhttp->parse(mhttp);
 
         }
     }
 
-    free(rec_buf);
+    free(recv_buf);
     mcr_free_http(mhttp);
 
 out:
