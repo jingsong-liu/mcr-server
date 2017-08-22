@@ -1,4 +1,5 @@
 # mcr-server
+> Your newborn http server.
 
 ## Overview
 mcr-server is an original http-server based on tcp.
