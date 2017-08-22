@@ -181,7 +181,6 @@ main(int argc, char** argv)
         printf("dict: %s\n", dict_dump((dict *)node->value, buf_test_dict, sizeof(buf_test_dict)));
 	}
 
-
 	listEmpty(dlist);
 	listReleaseIterator(li);
 	listRelease(dlist);
