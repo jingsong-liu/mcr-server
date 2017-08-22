@@ -16,7 +16,7 @@ In the future, it will serve for deploying static pages(some interesting web pag
 ## build and run
 ### 1.Get source code
 ```sh
-git clone https:/github.com/jeesyn/mcr-server
+git clone https://github.com/jeesyn/mcr-server
 ```
 
 ### 2.Compile 
@@ -33,4 +33,4 @@ Write server configurations to `Default.conf` file and start mcr-server
 ```
 
 ## Contributing
-Fork the mcr-server repostory and create pull request, it will be processed as soon as possible.
+Fork the mcr-server repository and create pull request, it will be processed as soon as possible.
