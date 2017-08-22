@@ -170,20 +170,20 @@ int
 main(int argc, char** argv)
 {
     /* test to_dict */
-	list *dlist = listCreate();
-	listNode *node = NULL;	
+    list *dlist = listCreate();
+    listNode *node = NULL;	
 
     int ret = to_dict("host: www.exmple.com zz.com dead.\n#service:mysql web\nPort:8080 8081", dlist);
     printf("to_dict ret:%d\n", ret);
     char buf_test_dict[MAX_WORD_NUM*MAX_WORD_SIZE];
-	listIter *li = listGetIterator(dlist, AL_START_HEAD);
-	while (NULL != (node = listNext(li))) {
+    listIter *li = listGetIterator(dlist, AL_START_HEAD);
+    while (NULL != (node = listNext(li))) {
         printf("dict: %s\n", dict_dump((dict *)node->value, buf_test_dict, sizeof(buf_test_dict)));
-	}
+    }
 
-	listEmpty(dlist);
-	listReleaseIterator(li);
-	listRelease(dlist);
+    listEmpty(dlist);
+    listReleaseIterator(li);
+    listRelease(dlist);
 
     return 0;
 }
