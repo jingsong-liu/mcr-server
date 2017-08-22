@@ -19,15 +19,16 @@ int mcr_body_callback(http_parser *_, const char *at, size_t length);;;;
 int mcr_message_complete_callback(http_parser *_);
 int mcr_chunk_callback(http_parser *_);
 int mcr_chunk_complete_callback(http_parser *_);
+int
+mcr_route(http_context *context);
 char *
-mcr_http_protocal(char *buf);
+mcr_http_protocol(char *buf);
 char *
 mcr_http_version(const char *version, char *buf);
 char*
 mcr_http_status(int status_code, char *buf);
 char *
 mcr_http_errno(int errnum, char *buf);
-
 char *
 mcr_http_newline(char *buf);
 char *
@@ -39,7 +40,7 @@ mcr_http_content_type(const char *content_type, char *buf);
 char *
 mcr_http_body(const char *msg, char *buf); 
 char *
-mcr_make_http_reponse(int status_code, int errnum, const char *msg, const char *content_type,  const char *version, char *buf);
+mcr_make_http_response(int status_code, int errnum, const char *body, const char *content_type,  const char *version, char *response);
 
 
 http_context *
@@ -107,7 +108,7 @@ mcr_free_http_parser(http_parser *hp)
 http_parser_settings*
 mcr_make_http_hook()
 {
-    http_parser_settings *settings = malloc(sizeof(http_parser));
+    http_parser_settings *settings = malloc(sizeof(http_parser_settings));
     if (settings == NULL) {
         return NULL;
     }
@@ -170,15 +171,14 @@ mcr_http_parse(mcr_http *mhttp)
 
     } else if (nparsed != *(mhttp->input_len)) {
         printf("http parsed failed\n");
+        return -1;
 
     } else {
-        if (nparsed == 0) ;
+        if (nparsed == 0) return 0;
         //printf("request method:%s \n", http_method_str(parser->method));
-        /* response */
-
     }
 
-    return 0;
+    return -1;
 }
 
 
@@ -191,6 +191,7 @@ mcr_make_http()
     }
 
     http_context *pcontext = mcr_make_http_context(&(mhttp->sock), 1024);
+    pcontext->complete_flag = 0;
     if (pcontext == NULL) {
         mcr_free_http(mhttp);
         return NULL;
@@ -240,19 +241,37 @@ mcr_free_http(mcr_http *mhttp)
 
 int mcr_message_begin_callback(http_parser *_)
 {
-    printf("mcr_message_begin_callback\n");
     return 0;
 }
 
 
-char *
-mcr_make_http_reponse(int status_code, int errnum, const char *msg, const char *content_type,  const char *version, char *buf);
+const char *local_url_table[] = {"/index.html", "test"};
 
+int
+mcr_url_check(const char* url, size_t len) 
+{
+    int i = 0;
+    /* is the url available for us? */
+    for (i = 0; i < sizeof(local_url_table); i ++) {
+        if (!strncmp(*(local_url_table + i), url, strlen(*(local_url_table + i)))) {
+            return 0;
+        }
+    }
+    return -1;
+}
 
 
 int mcr_url_callback(http_parser* _, const char *at, size_t length) {
-    printf("Url: %.*s\n", (int)length, at);
+    printf("url: %.*s\n", (int)length, at);
+    http_context *context = _->data;
+    /* url filter */
+    if (-1 == mcr_url_check(at, length)) {
+        /* stop parse right now. */
+        return -1;
+    }
 
+    /* save url */
+    snprintf(context->url, URL_MAX_LENGTH, "%.*s", (int)length, at);
     return 0;
 }
 
@@ -280,47 +299,86 @@ int mcr_headers_complete_callback(http_parser *_) {
 
 
 int mcr_body_callback(http_parser *_, const char *at, size_t length) {
-    printf("mcr_body_callback: %.*s\n", (int)length, at);
-
     return 0;
 }
 
 
 int mcr_message_complete_callback(http_parser *_) {
-    http_context *pcontext = (http_context *)_->data;
-    char msg_buffer[2048];
-    int msg_len = 0;
+    http_context *context = (http_context *)_->data;
 
-    int fd = open("index.html", O_RDONLY);
-    if (fd > 0 )  {
-        msg_len = read(fd, msg_buffer, 2048);
+    if (0 == mcr_route(context)) {
+        send(*context->sock, context->buffer, context->buf_len, 0);
+        context->complete_flag = 1;
     }
-
-    if (msg_len > 0) {
-        mcr_make_http_reponse(200, 0, msg_buffer, NULL, NULL, pcontext->buffer);
-        pcontext->buf_len = strlen(pcontext->buffer) + 1;
-        send(*pcontext->sock, pcontext->buffer, pcontext->buf_len, 0);
-    }
-
-    close(fd);
 
     return 0;
 }
 
+
 int mcr_chunk_callback(http_parser *_) {
-    printf("mcr_chunk_callback\n");
     return 0;
 }
 
 
 int mcr_chunk_complete_callback(http_parser *_) {
-    printf("mcr_chunk_complete_callback\n");
     return 0;
 }
 
 
+int
+url_handler(const char* path) {
+    /* map the path to costume method */
+    return -1;
+}
+
+
+/* TODO: implment translate url to workdir resource. */
+char*
+mcr_uri_of_workdir(const char *url, const char *workdir) {
+
+    /* translate url to file path in workdir */
+    char *filep = (char*)url + 1;   // just right move.
+    return filep;
+}
+
+
+int
+mcr_route(http_context *context)
+{
+    /* costume handler */
+    if (url_handler(context->url) == 0) {
+        return  0;
+    }
+
+    /* static file */
+    char body[2048];
+    char *sfile = mcr_uri_of_workdir(context->url, ".");
+    int fd = open(sfile, O_RDONLY);
+    if (fd < 0)  {
+        return -1;
+    }
+
+    context->content_len = read(fd, body, 2048);
+
+    if (context->content_len > 0) {
+        mcr_make_http_response(200, 0, body, NULL, NULL, context->buffer);
+        context->buf_len = strlen(context->buffer) + 1;
+        goto ok;
+    } else {
+        goto err;
+    }
+
+ok:
+    close(fd);
+    return 0;
+err:
+    close(fd);
+    return -1;
+}
+
+
 char *
-mcr_http_protocal(char *buf) {
+mcr_http_protocol(char *buf) {
     char *HTTP = "HTTP/";
     strcpy(buf, HTTP);
     return buf;
@@ -401,41 +459,41 @@ mcr_http_body(const char *msg, char *buf) {
 
 
 char *
-mcr_make_http_reponse(int status_code, int errnum, const char *msg, const char *content_type,  const char *version, char *buf)
+mcr_make_http_response(int status_code, int errnum, const char *body, const char *content_type,  const char *version, char *response)
 {
-    /* statu line */
-    mcr_http_protocal(buf);
+    /* status line */
+    mcr_http_protocol(response);
     if (version == NULL ) {
-        mcr_http_version(DEFAULT_HTTP_VERSION, buf);
+        mcr_http_version(DEFAULT_HTTP_VERSION, response);
     }
     else {
-        mcr_http_version(version, buf);
+        mcr_http_version(version, response);
     }
-    mcr_http_status(status_code, buf);
-    mcr_http_errno(errnum, buf);
-    mcr_http_newline(buf);
+    mcr_http_status(status_code, response);
+    mcr_http_errno(errnum, response);
+    mcr_http_newline(response);
 
     /* server line */
-    mcr_http_servername(SERVER_NAME, buf);
-    mcr_http_newline(buf);
+    mcr_http_servername(SERVER_NAME, response);
+    mcr_http_newline(response);
     
     /* content-len */
-    mcr_http_content_lenth(2048, buf);
-    mcr_http_newline(buf);
+    mcr_http_content_lenth(2048, response);
+    mcr_http_newline(response);
 
     /* content-type */
     if (content_type == NULL) {
-       mcr_http_content_type("text/html;charset=utf-8", buf);   //this should be read from file
+       mcr_http_content_type("text/html;charset=utf-8", response);   //this should be read from file
     }
     else {
-       mcr_http_content_type(content_type, buf);
+       mcr_http_content_type(content_type, response);
     }
 
-    mcr_http_newline(buf);
-    mcr_http_newline(buf);
+    mcr_http_newline(response);
+    mcr_http_newline(response);
 
     /* content-body */
-    mcr_http_body(msg, buf);
+    mcr_http_body(body, response);
 
-    return buf;
+    return response;
 }

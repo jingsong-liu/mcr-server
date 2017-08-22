@@ -3,10 +3,15 @@
 #include "../http-parser/http_parser.h"
 
 
+#define URL_MAX_LENGTH  2*1024
 typedef struct http_context_s {
     int *sock;
     void *buffer;
     int buf_len;
+
+    char url[URL_MAX_LENGTH];
+    size_t content_len;
+    int complete_flag;
 }http_context;
 
 typedef struct mcr_http_s mcr_http;

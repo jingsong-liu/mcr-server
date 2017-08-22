@@ -43,14 +43,20 @@ cli_conn(void* arg) {
 
     while(1)
     {
-        recved = recv(sock, recv_buf, sizeof(recv_buf), 0);
+        recved = recv(sock, recv_buf, 1024, 0);
         if (recved < 0) {
-            printf("read error: %s\n",  strerror(errno)); 
+            printf("sock read error: %s\n",  strerror(errno)); 
             break;
 
         } else {
             /* do parse in the loop, or in event handler */
-            mhttp->parse(mhttp);
+            if(0 != mhttp->parse(mhttp)) {
+                break;
+            }
+
+            if (mhttp->context->complete_flag == 1) {
+                break;
+            }
 
         }
     }
