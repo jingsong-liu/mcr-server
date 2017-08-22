@@ -24,12 +24,14 @@ struct cli_args {
 void *
 cli_conn(void* arg) {
     int sock = ((struct cli_args*)arg)->fd;
-    size_t recv_buflen = 80*1024, nparsed;
+    size_t recved = 0;
+
+    size_t recv_buflen = 80*1024;
     char *recv_buf = malloc(recv_buflen*sizeof(char));
     if (recv_buf == NULL) {
         goto out;
     }
-    ssize_t recved;
+
 
     mcr_http *mhttp = mcr_make_http();
     if (mhttp == NULL) {

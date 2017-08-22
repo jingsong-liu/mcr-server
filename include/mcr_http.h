@@ -14,18 +14,16 @@ typedef struct mcr_http_s mcr_http;
 struct mcr_http_s {
     int sock;    
     char *input;
-    int *input_len;
+    size_t *input_len;
     http_parser *parser;
     http_parser_settings *hooks;
     http_context *context;
 
-    void (*attach)(mcr_http *mhttp, int sock, char *input, int *input_len);
+    void (*attach)(mcr_http *mhttp, int sock, char *input, size_t *input_len);
     void (*unattach)(mcr_http *mhttp);
     int (*parse)(mcr_http *mhttp); // do the parse
 };
 
-
-char *mcr_make_http_reponse(int status_code, int errnum, const char *msg, const char *content_type,  const char *version, char *buf);
 
 mcr_http *mcr_make_http();
 void mcr_free_http(mcr_http *mhttp);

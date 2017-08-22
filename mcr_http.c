@@ -6,14 +6,10 @@
 #include <string.h>
 #include "include/mcr_http.h"
 
-int mcr_message_begin_callback(http_parser *_);
-char *
-mcr_make_http_reponse(int status_code, int errnum, const char *msg, const char *content_type,  const char *version, char *buf);
-
-
 
 #define SERVER_NAME "mcr-server"
 #define DEFAULT_HTTP_VERSION "1.1"
+int mcr_message_begin_callback(http_parser *_);
 int mcr_url_callback(http_parser* _, const char *at, size_t length);
 int mcr_status_callback(http_parser *_, const char *at, size_t length);
 int mcr_header_filed_callback(http_parser *_, const char *at, size_t length);
@@ -145,7 +141,7 @@ mcr_free_http_hook(http_parser_settings *settings)
  */
 
 void
-mcr_register_http(mcr_http *mhttp, int sock, char *input, int *input_len)
+mcr_register_http(mcr_http *mhttp, int sock, char *input, size_t *input_len)
 {
     mhttp->sock = sock;
     mhttp->input = input;
@@ -165,7 +161,7 @@ mcr_unregister_http(mcr_http *mhttp)
 int
 mcr_http_parse(mcr_http *mhttp)
 {
-    int nparsed;
+    size_t nparsed;
 
     nparsed = http_parser_execute(mhttp->parser, mhttp->hooks, mhttp->input, *(mhttp->input_len));
 
