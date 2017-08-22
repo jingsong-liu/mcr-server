@@ -11,7 +11,7 @@ LIBS ?= -lpthread
 DEPS = $(wildcard $(INCDIR)/*.h)
 
 SRC = $(wildcard *.c)
-OBJ = $(patsubst %.c, $(OBJDIR)/%.o, $(SRC))
+OBJ = $(patsubst %.c, $(OBJDIR)/%.o, $(SRC)) http-parser/http_parser.o
 
 
 mcr-server: $(OBJ)
