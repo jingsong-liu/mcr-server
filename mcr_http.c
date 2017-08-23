@@ -190,7 +190,7 @@ mcr_make_http(const char *wwwroot)
         return NULL;
     }
 
-    http_context *context = mcr_make_http_context(&(mhttp->sock), wwwroot, 1024);
+    http_context *context = mcr_make_http_context(&(mhttp->sock), wwwroot, 40*1024);
     context->complete_flag = 0;
     if (context == NULL) {
         mcr_free_http(mhttp);
@@ -261,7 +261,8 @@ mcr_url_check(const char* url, size_t len)
 }
 
 
-int mcr_url_callback(http_parser* _, const char *at, size_t length) {
+int mcr_url_callback(http_parser* _, const char *at, size_t length)
+{
     printf("url: %.*s\n", (int)length, at);
     http_context *context = _->data;
     /* url filter */
@@ -276,34 +277,40 @@ int mcr_url_callback(http_parser* _, const char *at, size_t length) {
 }
 
 
-int mcr_status_callback(http_parser *_, const char *at, size_t length) {
+int mcr_status_callback(http_parser *_, const char *at, size_t length)
+{
 
     return 0;
 }
 
 
-int mcr_header_filed_callback(http_parser *_, const char *at, size_t length) {
+int mcr_header_filed_callback(http_parser *_, const char *at, size_t length)
+{
     return 0;
 }
 
 
-int mcr_header_value_callback(http_parser *_, const char *at, size_t length) {
+int mcr_header_value_callback(http_parser *_, const char *at, size_t length)
+{
 
     return 0;
 }
 
 
-int mcr_headers_complete_callback(http_parser *_) {
+int mcr_headers_complete_callback(http_parser *_)
+{
     return 0;
 }
 
 
-int mcr_body_callback(http_parser *_, const char *at, size_t length) {
+int mcr_body_callback(http_parser *_, const char *at, size_t length)
+{
     return 0;
 }
 
 
-int mcr_message_complete_callback(http_parser *_) {
+int mcr_message_complete_callback(http_parser *_)
+{
     http_context *context = (http_context *)_->data;
 
     if (0 == mcr_route(context)) {
@@ -315,25 +322,29 @@ int mcr_message_complete_callback(http_parser *_) {
 }
 
 
-int mcr_chunk_callback(http_parser *_) {
+int mcr_chunk_callback(http_parser *_)
+{
     return 0;
 }
 
 
-int mcr_chunk_complete_callback(http_parser *_) {
+int mcr_chunk_complete_callback(http_parser *_)
+{
     return 0;
 }
 
 
 int
-url_handler(const char* path) {
+url_handler(const char* path)
+{
     /* map the path to costume method */
     return -1;
 }
 
 
 char*
-mcr_uri_of_wwwroot(const char *wwwroot, const char *url) {
+mcr_uri_of_wwwroot(const char *wwwroot, const char *url)
+{
 
     /* translate url to file path in workdir */
     int uri_len = strlen(wwwroot) + strlen(url) + 1;
@@ -359,11 +370,12 @@ mcr_route(http_context *context)
     char body[2048];
     char *sfile = mcr_uri_of_wwwroot(context->wwwroot, context->url);
     int fd = open(sfile, O_RDONLY);
-    if (fd < 0)  {
+    free(sfile);
+    if (fd < 0) {
         return -1;
     }
 
-    context->content_len = read(fd, body, 2048);
+    context->content_len = read(fd, body, 30*1024);
 
     if (context->content_len > 0) {
         mcr_make_http_response(200, 0, body, context->content_len, "text/html;charset=utf-8", NULL, context->buffer);
@@ -383,7 +395,8 @@ err:
 
 
 char *
-mcr_http_protocol(char *buf) {
+mcr_http_protocol(char *buf)
+{
     char *HTTP = "HTTP/";
     strcpy(buf, HTTP);
     return buf;
@@ -391,7 +404,8 @@ mcr_http_protocol(char *buf) {
 
 
 char *
-mcr_http_version(const char *version, char *buf) {
+mcr_http_version(const char *version, char *buf)
+{
     strcat(buf, version);
     strcat(buf, " ");
 
@@ -401,7 +415,8 @@ mcr_http_version(const char *version, char *buf) {
 
 
 char*
-mcr_http_status(int status_code, char *buf) {
+mcr_http_status(int status_code, char *buf)
+{
     char numstr[8];
     snprintf(numstr, sizeof(numstr), "%d ", status_code);;
     strcat(buf, numstr);
@@ -411,7 +426,8 @@ mcr_http_status(int status_code, char *buf) {
     
     
 char *
-mcr_http_errno(int errnum, char *buf) {
+mcr_http_errno(int errnum, char *buf)
+{
     char numstr[8]; 
     snprintf(numstr, sizeof(numstr), "%d ", errnum);;
     strcat(buf, numstr);
@@ -420,14 +436,16 @@ mcr_http_errno(int errnum, char *buf) {
 
 
 char *
-mcr_http_newline(char *buf) {
+mcr_http_newline(char *buf)
+{
     strcat(buf, "\r\n");
     return buf;
 }
 
 
 char *
-mcr_http_servername (const char * servername, char *buf) {
+mcr_http_servername (const char * servername, char *buf)
+{
     char *serverfield = "Server: ";
     strcat(buf, serverfield);
     strcat(buf, servername);
@@ -436,7 +454,8 @@ mcr_http_servername (const char * servername, char *buf) {
 
 
 char *
-mcr_http_content_lenth(size_t content_len, char *buf) {
+mcr_http_content_lenth(size_t content_len, char *buf)
+{
     char numstr[8];
     snprintf(numstr, sizeof(numstr), "%d ", (int)content_len);;
     strcat(buf, "Content-Length: ");
@@ -446,14 +465,16 @@ mcr_http_content_lenth(size_t content_len, char *buf) {
 
 
 char *
-mcr_http_content_type(const char *content_type, char *buf) {
+mcr_http_content_type(const char *content_type, char *buf)
+{
     strcat(buf, "Content-Type: ");
     strcat(buf, content_type);
     return buf;
 }
 
 char *
-mcr_http_body(const char *msg, char *buf) {
+mcr_http_body(const char *msg, char *buf)
+{
         strcat(buf, msg);
     return buf;
 }
