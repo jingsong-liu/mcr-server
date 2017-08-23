@@ -104,7 +104,6 @@ mcr_free_http_parser(http_parser *hp)
 }
 
 
-
 http_parser_settings*
 mcr_make_http_hook()
 {
@@ -170,7 +169,8 @@ mcr_http_parse(mcr_http *mhttp)
         /* websocket */
 
     } else if (nparsed != *(mhttp->input_len)) {
-        printf("http parsed failed\n");
+        printf("http parse error: %s(%s)\n", http_errno_name(mhttp->parser->http_errno),
+            http_errno_description(mhttp->parser->http_errno));
         return -1;
 
     } else {
@@ -239,21 +239,25 @@ mcr_free_http(mcr_http *mhttp)
     free(mhttp);
 }
 
+
 int mcr_message_begin_callback(http_parser *_)
 {
     return 0;
 }
 
 
-const char *local_url_table[] = {"/index.html", "test"};
-
 int
-mcr_url_check(const char* url, size_t len) 
+mcr_url_check(const char* url, size_t len, const char ** filter)
 {
     int i = 0;
+
+    if (filter == NULL) {
+        return 0;
+    }
+
     /* is the url available for us? */
-    for (i = 0; i < sizeof(local_url_table); i ++) {
-        if (!strncmp(*(local_url_table + i), url, strlen(*(local_url_table + i)))) {
+    for (i = 0; i < sizeof(filter); i ++) {
+        if (!strncmp(*(filter + i), url, strlen(*(filter + i)))) {
             return 0;
         }
     }
@@ -266,7 +270,7 @@ int mcr_url_callback(http_parser* _, const char *at, size_t length)
     printf("url: %.*s\n", (int)length, at);
     http_context *context = _->data;
     /* url filter */
-    if (-1 == mcr_url_check(at, length)) {
+    if (-1 == mcr_url_check(at, length, NULL)) {
         /* stop parse right now. */
         return -1;
     }
