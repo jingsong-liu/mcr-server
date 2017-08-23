@@ -317,11 +317,12 @@ int mcr_message_complete_callback(http_parser *_)
 {
     http_context *context = (http_context *)_->data;
 
-    if (0 == mcr_route(context)) {
-        send(*context->sock, context->buffer, context->buf_len, 0);
-        context->complete_flag = 1;
+    mcr_route(context);
+    if (0 != send(*context->sock, context->buffer, context->buf_len, 0)) {
+        return -1;
     }
 
+    context->complete_flag = 1;
     return 0;
 }
 
@@ -376,7 +377,7 @@ mcr_route(http_context *context)
     int fd = open(sfile, O_RDONLY);
     free(sfile);
     if (fd < 0) {
-        return -1;
+        goto not_found;
     }
 
     context->content_len = read(fd, body, 30*1024);
@@ -386,14 +387,16 @@ mcr_route(http_context *context)
         context->buf_len = strlen(context->buffer) + 1;
         goto ok;
     } else {
-        goto err;
+        close(fd);
+        goto not_found;
     }
 
 ok:
     close(fd);
     return 0;
-err:
-    close(fd);
+
+not_found:
+    mcr_make_http_response(404, 0, NULL, 0, 0, NULL, context->buffer);
     return -1;
 }
 
@@ -477,9 +480,10 @@ mcr_http_content_type(const char *content_type, char *buf)
 }
 
 char *
-mcr_http_body(const char *msg, char *buf)
+mcr_http_body(const char *body, char *buf)
 {
-        strcat(buf, msg);
+    if (body)
+        strcat(buf, body);
     return buf;
 }
 
