@@ -56,7 +56,8 @@ to_words(const char* buf, char **words, int w_maxnum)
             if ((*w_start >= 'a' && *w_start <= 'z') ||
                 (*w_start >= 'A' && *w_start <= 'Z') ||
                 (*w_start >= '0' && *w_start <= '9') ||
-                (*w_start == '_'))
+                (*w_start == '_')                    ||
+                (*w_start == '/'))
                 break;
         }
 
