@@ -13,7 +13,7 @@
 #include "include/mcr_server_config.h"
 #include "include/mcr_http.h"
 
-#define SERVER_CONFIG_FILE      "./default.conf"
+#define DEFAULT_SERVER_CONFIG_FILE      "./default.conf"
 
 struct cli_args {
     int fd;
@@ -153,11 +153,54 @@ select_addr_info(char* hostname, char* service, struct addrinfo** ai_list) {
 }
 
 
+void
+usage()
+{
+    char version[] = "1.1";
+    printf("mcr-server-v%s Usage:\n"
+           "  ./mcr-server [-c config_file] [-d] \n"
+           ,version);
+}
+
+
+void
+help()
+{
+    char version[] = "1.1";
+    printf("mcr-server-v%s Help:\n"
+           "  -c config file\n"
+           "  -d run as deamon\n"
+           "  -h show help\n",
+           version);
+}
+
+
+extern char *optarg;
 int
-main(void)
+main(int argc, char* argv[])
 {
     struct server_config config;
-    if ( -1 == read_server_config(SERVER_CONFIG_FILE, &config)) {
+    char *server_config_file = DEFAULT_SERVER_CONFIG_FILE;
+    int c = -1;
+    while((c = getopt(argc, argv, "c:dh")) != -1) {
+        switch(c) {
+            case 'c': /* config file */
+                server_config_file = optarg;
+                break;
+            case 'd': /* run as deamon */
+
+                break;
+            case 'h': /* show help */
+                help();
+                exit(0);
+            default:
+                usage();
+                exit(-1);
+        }
+
+    }
+
+    if ( -1 == read_server_config(server_config_file, &config)) {
         printf("error read_server_config :%s\n", strerror(errno));
     }
 
