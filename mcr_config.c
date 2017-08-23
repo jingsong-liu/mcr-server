@@ -1,5 +1,5 @@
 #include "include/mcr_define.h"
-#include "include/mcr_server_config.h"
+#include "include/mcr_config.h"
 #include "include/mcr_dict.h"
 #include <unistd.h>
 #include <fcntl.h>

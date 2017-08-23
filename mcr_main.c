@@ -10,7 +10,7 @@
 #include <pthread.h>
 #include <fcntl.h>
 #include <netdb.h>
-#include "include/mcr_server_config.h"
+#include "include/mcr_config.h"
 #include "include/mcr_http.h"
 
 #define DEFAULT_SERVER_CONFIG_FILE      "./default.conf"
