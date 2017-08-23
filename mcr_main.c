@@ -182,13 +182,14 @@ main(int argc, char* argv[])
     struct server_config config;
     char *server_config_file = DEFAULT_SERVER_CONFIG_FILE;
     int c = -1;
+    int daemonize = 0;
     while((c = getopt(argc, argv, "c:dh")) != -1) {
         switch(c) {
             case 'c': /* config file */
                 server_config_file = optarg;
                 break;
             case 'd': /* run as deamon */
-
+                daemonize = 1;
                 break;
             case 'h': /* show help */
                 help();
@@ -231,6 +232,12 @@ main(int argc, char* argv[])
     }
 
 	freeaddrinfo(ai_list);
+
+    if (daemonize) {
+        printf("daemonize mcr-server ...\n");
+        /* change work directory to root, redirect stdio to /dev/null. */
+        daemon(0, 0);
+    }
 
     if (-1 == serve(server_sock)) {
         printf("server loop exited unexpected, error: %s.\n", strerror(errno));
