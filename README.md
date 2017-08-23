@@ -27,9 +27,9 @@ make
 Executable file `mcr-server` will be generate in current directory.
 
 ### 3.Config and run
-Write server configurations to `Default.conf` file and start mcr-server
+Write server configurations to `yourconfigure.conf` file, and start mcr-server with option -c. Otherwise `default.conf` will be load.
 ```sh
-./mcr-server
+./mcr-server [-c yourconfigure.conf] [-d]
 ```
 
 ## Contributing
