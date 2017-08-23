@@ -34,13 +34,13 @@ mcr_http_newline(char *buf);
 char *
 mcr_http_servername (const char * servername, char *buf);
 char *
-mcr_http_content_lenth(int content_len, char *buf);
+mcr_http_content_lenth(size_t content_len, char *buf);
 char *
 mcr_http_content_type(const char *content_type, char *buf);
 char *
 mcr_http_body(const char *msg, char *buf); 
 char *
-mcr_make_http_response(int status_code, int errnum, const char *body, const char *content_type,  const char *version, char *response);
+mcr_make_http_response(int status_code, int errnum, const char *body, size_t content_len, const char *content_type,  const char *version, char *response);
 
 
 http_context *
@@ -361,7 +361,7 @@ mcr_route(http_context *context)
     context->content_len = read(fd, body, 2048);
 
     if (context->content_len > 0) {
-        mcr_make_http_response(200, 0, body, NULL, NULL, context->buffer);
+        mcr_make_http_response(200, 0, body, context->content_len, "text/html;charset=utf-8", NULL, context->buffer);
         context->buf_len = strlen(context->buffer) + 1;
         goto ok;
     } else {
@@ -431,9 +431,9 @@ mcr_http_servername (const char * servername, char *buf) {
 
 
 char *
-mcr_http_content_lenth(int content_len, char *buf) {
+mcr_http_content_lenth(size_t content_len, char *buf) {
     char numstr[8];
-    snprintf(numstr, sizeof(numstr), "%d ", content_len);;
+    snprintf(numstr, sizeof(numstr), "%d ", (int)content_len);;
     strcat(buf, "Content-Length: ");
     strcat(buf, numstr);
     return buf;
@@ -459,7 +459,7 @@ mcr_http_body(const char *msg, char *buf) {
 
 
 char *
-mcr_make_http_response(int status_code, int errnum, const char *body, const char *content_type,  const char *version, char *response)
+mcr_make_http_response(int status_code, int errnum, const char *body, size_t content_len, const char *content_type,  const char *version, char *response)
 {
     /* status line */
     mcr_http_protocol(response);
@@ -478,12 +478,12 @@ mcr_make_http_response(int status_code, int errnum, const char *body, const char
     mcr_http_newline(response);
     
     /* content-len */
-    mcr_http_content_lenth(2048, response);
+    mcr_http_content_lenth(content_len, response);
     mcr_http_newline(response);
 
     /* content-type */
     if (content_type == NULL) {
-       mcr_http_content_type("text/html;charset=utf-8", response);   //this should be read from file
+       mcr_http_content_type("text/html;charset=utf-8", response);   //this should be read from html file or given by caller.
     }
     else {
        mcr_http_content_type(content_type, response);
