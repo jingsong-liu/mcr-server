@@ -17,13 +17,15 @@
 
 struct cli_args {
     int fd;
-    int reserved;
+    char *wwwroot;
+    /* resverd */
 };
 
 
 void *
 cli_conn(void* arg) {
     int sock = ((struct cli_args*)arg)->fd;
+    char *wwwroot= ((struct cli_args*)arg)->wwwroot;
     size_t recved = 0;
 
     size_t recv_buflen = 80*1024;
@@ -33,7 +35,7 @@ cli_conn(void* arg) {
     }
 
 
-    mcr_http *mhttp = mcr_make_http();
+    mcr_http *mhttp = mcr_make_http(wwwroot);
     if (mhttp == NULL) {
         free(recv_buf);
         goto out;
@@ -104,7 +106,7 @@ server_init(int family, int type, struct sockaddr_in* server_addr, int backlog) 
 }
 
 int
-serve(int server_sock)
+serve(int server_sock, struct server_config config)
 {
     struct sockaddr_in client_addr;
     socklen_t client_addr_len= sizeof(client_addr);
@@ -121,6 +123,7 @@ serve(int server_sock)
             ntohs(client_addr.sin_port));
 
         cargs.fd = new_fd;
+        cargs.wwwroot = config.wwwroot;
         if(0 != pthread_create(&pid, NULL, cli_conn, (void *)&cargs)) {
             printf("create pthread error: %s\n", strerror(errno));
             return -1;
@@ -239,7 +242,7 @@ main(int argc, char* argv[])
         daemon(0, 0);
     }
 
-    if (-1 == serve(server_sock)) {
+    if (-1 == serve(server_sock, config)) {
         printf("server loop exited unexpected, error: %s.\n", strerror(errno));
     }
 

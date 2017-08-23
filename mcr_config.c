@@ -11,6 +11,7 @@
 #define OPT_SERVICE             SERVER_OPT_BASE + 2
 #define OPT_BACKLOG             SERVER_OPT_BASE + 3
 #define OPT_PORT                SERVER_OPT_BASE + 4
+#define OPT_WWWROOT             SERVER_OPT_BASE + 5
 
 
 struct config_opt {
@@ -24,6 +25,7 @@ static const struct config_opt server_opt_array[] = {
     {"Service",        OPT_SERVICE,    SERVICE_NAME_MAX},
     {"BackLog",        OPT_BACKLOG,    BACKLOG_MAX},
     {"Port",           OPT_PORT,       PORT_MAX},
+    {"wwwroot",        OPT_WWWROOT,    FILEPATH_MAX},
 };
 
 
@@ -100,6 +102,9 @@ read_server_config(const char* path, struct server_config* sc)
             }
             else if (!strcmp(get_optname(OPT_BACKLOG), d->key)) {
                 sc->backlog = atoi(*(d->values));
+            }
+            else if (!strcmp(get_optname(OPT_WWWROOT), d->key)) {
+                strncpy(sc->wwwroot, *(d->values), sizeof(sc->wwwroot));
             }
             else {
                 /* ignore */

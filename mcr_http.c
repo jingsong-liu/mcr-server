@@ -41,40 +41,40 @@ char *
 mcr_http_body(const char *msg, char *buf); 
 char *
 mcr_make_http_response(int status_code, int errnum, const char *body, size_t content_len, const char *content_type,  const char *version, char *response);
-
+http_context *
+mcr_make_http_context(int *sock, const char *wwwroot, size_t buf_len);
 
 http_context *
-mcr_make_http_context(int *sock, size_t buf_len)
+mcr_make_http_context(int *sock, const char *wwwroot, size_t buf_len)
 {
-    http_context *pcontext = malloc(sizeof(http_context));
-    if (pcontext == NULL) {
+    http_context *context = malloc(sizeof(http_context));
+    if (context == NULL) {
         return NULL;
     }
-
-    pcontext->sock = sock;
-    pcontext->buffer = malloc(buf_len*sizeof(char));
-    if (pcontext->buffer == NULL) {
-        free(pcontext);
+    context->sock = sock;
+    context->buffer = malloc(buf_len*sizeof(char));
+    if (context->buffer == NULL) {
+        free(context);
         return NULL;
     }
-
-    pcontext->buf_len = buf_len;
-    return pcontext;
+    context->buf_len = buf_len;
+    context->wwwroot = wwwroot;
+    return context;
 }
 
 
 void
-mcr_free_http_context(http_context *pcontext)
+mcr_free_http_context(http_context *context)
 {
-    if (pcontext == NULL) {
+    if (context == NULL) {
         return ;
     }
 
-    if (pcontext->buffer != NULL ) {
-        free(pcontext->buffer);
+    if (context->buffer != NULL ) {
+        free(context->buffer);
     }
 
-    free(pcontext);
+    free(context);
 }
 
 
@@ -142,7 +142,7 @@ mcr_free_http_hook(http_parser_settings *settings)
  */
 
 void
-mcr_register_http(mcr_http *mhttp, int sock, char *input, size_t *input_len)
+mcr_register_http(mcr_http *mhttp, int sock, const char *input, size_t *input_len)
 {
     mhttp->sock = sock;
     mhttp->input = input;
@@ -183,34 +183,34 @@ mcr_http_parse(mcr_http *mhttp)
 
 
 mcr_http *
-mcr_make_http()
+mcr_make_http(const char *wwwroot)
 {
     mcr_http * mhttp = malloc(sizeof(mcr_http));
     if (mhttp == NULL) {
         return NULL;
     }
 
-    http_context *pcontext = mcr_make_http_context(&(mhttp->sock), 1024);
-    pcontext->complete_flag = 0;
-    if (pcontext == NULL) {
+    http_context *context = mcr_make_http_context(&(mhttp->sock), wwwroot, 1024);
+    context->complete_flag = 0;
+    if (context == NULL) {
         mcr_free_http(mhttp);
         return NULL;
     }
-    mhttp->context = pcontext;
+    mhttp->context = context;
 
     http_parser* hp = mcr_make_http_parser();
     if (hp == NULL) {
         mcr_free_http(mhttp);
-        mcr_free_http_context(pcontext);
+        mcr_free_http_context(context);
         return NULL;
     }
-    hp->data = pcontext;
+    hp->data = context;
     mhttp->parser = hp;
 
     http_parser_settings *hooks= mcr_make_http_hook();
     if (hooks == NULL) {
         mcr_free_http(mhttp);
-        mcr_free_http_context(pcontext);
+        mcr_free_http_context(context);
         mcr_free_http_parser(hp);
         return NULL;
     }
@@ -332,13 +332,18 @@ url_handler(const char* path) {
 }
 
 
-/* TODO: implment translate url to workdir resource. */
 char*
-mcr_uri_of_workdir(const char *url, const char *workdir) {
+mcr_uri_of_wwwroot(const char *wwwroot, const char *url) {
 
     /* translate url to file path in workdir */
-    char *filep = (char*)url + 1;   // just right move.
-    return filep;
+    int uri_len = strlen(wwwroot) + strlen(url) + 1;
+    char *uri= malloc(uri_len*sizeof(char));
+    if (uri == NULL)
+        return NULL;
+
+    memcpy(uri, wwwroot, strlen(wwwroot));
+    memcpy(uri + strlen(wwwroot), url, strlen(url) + 1);
+    return uri;
 }
 
 
@@ -352,7 +357,7 @@ mcr_route(http_context *context)
 
     /* static file */
     char body[2048];
-    char *sfile = mcr_uri_of_workdir(context->url, ".");
+    char *sfile = mcr_uri_of_wwwroot(context->wwwroot, context->url);
     int fd = open(sfile, O_RDONLY);
     if (fd < 0)  {
         return -1;
