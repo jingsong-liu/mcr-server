@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include "include/mcr_http.h"
+#include "include/mcr_define.h"
 
 
 #define SERVER_NAME "mcr-server"
@@ -158,6 +159,7 @@ mcr_unregister_http(mcr_http *mhttp)
 }
 
 
+/* return OK, ERR, CONTINUE */
 int
 mcr_http_parse(mcr_http *mhttp)
 {
@@ -171,14 +173,14 @@ mcr_http_parse(mcr_http *mhttp)
     } else if (nparsed != *(mhttp->input_len)) {
         printf("http parse error: %s(%s)\n", http_errno_name(mhttp->parser->http_errno),
             http_errno_description(mhttp->parser->http_errno));
-        return -1;
+        return MCR_ERR;
 
     } else {
-        if (nparsed == 0) return 0;
+        if (nparsed == 0) return MCR_OK;
         //printf("request method:%s \n", http_method_str(parser->method));
     }
 
-    return -1;
+    return MCR_EAGAIN;
 }
 
 

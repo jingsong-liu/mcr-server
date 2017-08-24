@@ -12,6 +12,7 @@
 #include <netdb.h>
 #include "include/mcr_config.h"
 #include "include/mcr_http.h"
+#include "include/mcr_define.h"
 
 #define DEFAULT_SERVER_CONFIG_FILE      "./default.conf"
 
@@ -27,6 +28,7 @@ cli_conn(void* arg) {
     int sock = ((struct cli_args*)arg)->fd;
     char *wwwroot= ((struct cli_args*)arg)->wwwroot;
     size_t recved = 0;
+    int parse_ret = MCR_OK;
 
     size_t recv_buflen = 80*1024;
     char *recv_buf = malloc(recv_buflen*sizeof(char));
@@ -52,14 +54,16 @@ cli_conn(void* arg) {
 
         } else {
             /* do parse in the loop, or in event handler */
-            if(0 != mhttp->parse(mhttp)) {
+            parse_ret = mhttp->parse(mhttp);
+            if(parse_ret == MCR_EAGAIN) {
+                continue;
+            }
+            else {
+                /* parse_ret == MCR_ERR || parse_ret == MCR_OK
+                   parse ok/error ,exit
+                 */
                 break;
             }
-
-            if (mhttp->context->complete_flag == 1) {
-                break;
-            }
-
         }
     }
 
