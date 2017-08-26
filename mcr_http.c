@@ -356,13 +356,19 @@ mcr_uri_of_wwwroot(const char *wwwroot, const char *url)
 {
 
     /* translate url to file path in workdir */
-    int uri_len = strlen(wwwroot) + strlen(url) + 1;
+    const char index_html[] = "/index.html";
+    int extl = strlen(url) > strlen(index_html) ? strlen(url) : strlen(index_html);
+    int uri_len = strlen(wwwroot) + extl + 1;
     char *uri= malloc(uri_len*sizeof(char));
     if (uri == NULL)
         return NULL;
-
     memcpy(uri, wwwroot, strlen(wwwroot));
-    memcpy(uri + strlen(wwwroot), url, strlen(url) + 1);
+    if (!strcmp(url, "/")) {
+        memcpy(uri + strlen(wwwroot), index_html, strlen(index_html) + 1);
+    }
+    else {
+        memcpy(uri + strlen(wwwroot), url, strlen(url) + 1);
+    }
     return uri;
 }
 
@@ -386,7 +392,6 @@ mcr_get_mimetype(const char *filename, char *mimetype)
                 strcpy(mimetype, mimeT[1]);
             }
             strcat(mimetype, support_mimes[i]);
-            printf("mimetype: %s\n", mimetype);
             return 0;
         }
     }
