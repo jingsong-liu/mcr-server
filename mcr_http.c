@@ -176,7 +176,10 @@ mcr_http_parse(mcr_http *mhttp)
         return MCR_ERR;
 
     } else {
-        if (nparsed == 0) return MCR_OK;
+        if (nparsed == 0)
+            return MCR_OK;
+        if (mhttp->context->complete_flag == 1)
+            return MCR_OK;
         //printf("request method:%s \n", http_method_str(parser->method));
     }
 
@@ -192,7 +195,7 @@ mcr_make_http(const char *wwwroot)
         return NULL;
     }
 
-    http_context *context = mcr_make_http_context(&(mhttp->sock), wwwroot, 40*1024);
+    http_context *context = mcr_make_http_context(&(mhttp->sock), wwwroot, 80*1024);
     context->complete_flag = 0;
     if (context == NULL) {
         mcr_free_http(mhttp);
@@ -320,7 +323,7 @@ int mcr_message_complete_callback(http_parser *_)
     http_context *context = (http_context *)_->data;
 
     mcr_route(context);
-    if (0 != send(*context->sock, context->buffer, context->buf_len, 0)) {
+    if (-1 == send(*context->sock, context->buffer, context->buf_len, 0)) {
         return -1;
     }
 
@@ -374,7 +377,7 @@ mcr_route(http_context *context)
     }
 
     /* static file */
-    char body[2048];
+    char *body = NULL;
     char *sfile = mcr_uri_of_wwwroot(context->wwwroot, context->url);
     int fd = open(sfile, O_RDONLY);
     free(sfile);
@@ -382,7 +385,12 @@ mcr_route(http_context *context)
         goto not_found;
     }
 
-    context->content_len = read(fd, body, 30*1024);
+    body = malloc(64*1024*sizeof(char));
+    if (body == NULL) {
+        close(fd);
+        return -1;
+    }
+    context->content_len = read(fd, body, 64*1024);
 
     if (context->content_len > 0) {
         mcr_make_http_response(200, 0, body, context->content_len, "text/html;charset=utf-8", NULL, context->buffer);
@@ -390,11 +398,13 @@ mcr_route(http_context *context)
         goto ok;
     } else {
         close(fd);
+        free(body);
         goto not_found;
     }
 
 ok:
     close(fd);
+    free(body);
     return 0;
 
 not_found:
