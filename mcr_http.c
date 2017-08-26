@@ -7,7 +7,6 @@
 #include "include/mcr_http.h"
 #include "include/mcr_define.h"
 
-
 #define SERVER_NAME "mcr-server"
 #define DEFAULT_HTTP_VERSION "1.1"
 int mcr_message_begin_callback(http_parser *_);
@@ -368,6 +367,34 @@ mcr_uri_of_wwwroot(const char *wwwroot, const char *url)
 }
 
 
+/*TODO  easy implment of get mimetype from file name. */
+int
+mcr_get_mimetype(const char *filename, char *mimetype)
+{
+    const char *support_mimes[] = {"html", "css", "js", "jpg", "jpeg", "png", };
+    const char *mimeT[] = {"text/", "image/",};
+
+    int i = 0;
+    char * ext = strrchr(filename, '.');
+    ext ++;
+    for (i = 0; i < sizeof(support_mimes)/sizeof(char*); i++) {
+        if (!strcmp(ext, support_mimes[i])) {
+            if (i < 4) {
+                strcpy(mimetype, mimeT[0]);
+            }
+            else {
+                strcpy(mimetype, mimeT[1]);
+            }
+            strcat(mimetype, support_mimes[i]);
+            printf("mimetype: %s\n", mimetype);
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+
 int
 mcr_route(http_context *context)
 {
@@ -380,30 +407,37 @@ mcr_route(http_context *context)
     char *body = NULL;
     char *sfile = mcr_uri_of_wwwroot(context->wwwroot, context->url);
     int fd = open(sfile, O_RDONLY);
-    free(sfile);
     if (fd < 0) {
+        close(fd);
+        free(sfile);
         goto not_found;
     }
 
     body = malloc(64*1024*sizeof(char));
     if (body == NULL) {
         close(fd);
+        free(sfile);
+        close(fd);
         return -1;
     }
     context->content_len = read(fd, body, 64*1024);
 
     if (context->content_len > 0) {
-        mcr_make_http_response(200, 0, body, context->content_len, "text/html;charset=utf-8", NULL, context->buffer);
+        char content_type[128];
+        mcr_get_mimetype(sfile, content_type);
+        mcr_make_http_response(200, 0, body, context->content_len, content_type, NULL, context->buffer);
         context->buf_len = strlen(context->buffer) + 1;
         goto ok;
     } else {
         close(fd);
+        free(sfile);
         free(body);
         goto not_found;
     }
 
 ok:
     close(fd);
+    free(sfile);
     free(body);
     return 0;
 
