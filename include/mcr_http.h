@@ -7,7 +7,7 @@
 typedef struct http_context_s {
     int *sock;
     void *buffer;
-    int buf_len;
+    ssize_t buf_len;
 
     char url[URL_MAX_LENGTH];
     const char *wwwroot;

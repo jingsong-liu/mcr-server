@@ -8,7 +8,7 @@
 #include "include/mcr_http.h"
 #include "include/mcr_define.h"
 
-#define SERVER_NAME "mcr-server"
+#define SERVER_NAME "mcr-server/0.90"
 #define DEFAULT_HTTP_VERSION "1.1"
 int mcr_message_begin_callback(http_parser *_);
 int mcr_url_callback(http_parser* _, const char *at, size_t length);
@@ -39,9 +39,9 @@ mcr_http_content_lenth(size_t content_len, char *buf);
 char *
 mcr_http_content_type(const char *content_type, char *buf);
 char *
-mcr_http_body(const char *msg, char *buf); 
-char *
-mcr_make_http_response(int status_code, int errnum, const char *body, size_t content_len, const char *content_type,  const char *version, char *response);
+mcr_http_body(const char *body, ssize_t body_len, char *buf);
+size_t
+mcr_make_http_response(int status_code, int errnum, const char *body, ssize_t content_len, const char *content_type,  const char *version, char *response);
 http_context *
 mcr_make_http_context(int *sock, const char *wwwroot, size_t buf_len);
 
@@ -431,8 +431,7 @@ mcr_route(http_context *context)
     if (context->content_len > 0) {
         char content_type[128];
         mcr_get_mimetype(sfile, content_type);
-        mcr_make_http_response(200, 0, body, context->content_len, content_type, NULL, context->buffer);
-        context->buf_len = strlen(context->buffer) + 1;
+        context->buf_len = mcr_make_http_response(200, 0, body, context->content_len, content_type, NULL, context->buffer);
         goto ok;
     } else {
         close(fd);
@@ -448,7 +447,7 @@ ok:
     return 0;
 
 not_found:
-    mcr_make_http_response(404, 0, NULL, 0, 0, NULL, context->buffer);
+    context->buf_len = mcr_make_http_response(404, 0, NULL, 0, 0, NULL, context->buffer);
     return -1;
 }
 
@@ -534,10 +533,10 @@ mcr_http_content_type(const char *content_type, char *buf)
 
 /*TODO: body content maybe raw data, take care of it, */
 char *
-mcr_http_body(const char *body, size_t body_len, char *buf)
+mcr_http_body(const char *body, ssize_t body_len, char *buf)
 {
-    int offset = strlen(buff) + 1;
-    if (body)
+    int offset = strlen(buf);
+    if (body && (body_len > 0))
         memcpy(buf + offset, body, body_len);
     return buf;
 }
@@ -572,13 +571,11 @@ mcr_http_date(const char *date, char *buf)
 }
 
 
-#define SERVER_NAME "mcr-server"
-#define DEFAULT_HTTP_VERSION "1.1"
-
-
-char *
-mcr_make_http_response(int status_code, int errnum, const char *body, size_t content_len, const char *content_type,  const char *protocol, char *response)
+size_t
+mcr_make_http_response(int status_code, int errnum, const char *body, ssize_t content_len, const char *content_type,  const char *protocol, char *response)
 {
+    size_t response_len = 0;
+
     /* status line */
     mcr_http_protocol(response);
     if (protocol == NULL ) {
@@ -620,8 +617,11 @@ mcr_make_http_response(int status_code, int errnum, const char *body, size_t con
     /* blank line */
     mcr_http_newline(response);
 
-    /* content-body */
-    mcr_http_body(body, response);
+    response_len = strlen(response);
 
-    return response;
+    /* content-body */
+    mcr_http_body(body, content_len, response);
+
+    response_len += content_len;
+    return response_len;
 }
