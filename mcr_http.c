@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
 #include "include/mcr_http.h"
 #include "include/mcr_define.h"
 
@@ -24,7 +25,7 @@ mcr_route(http_context *context);
 char *
 mcr_http_protocol(char *buf);
 char *
-mcr_http_version(const char *version, char *buf);
+mcr_http_protocol_version(const char *version, char *buf);
 char*
 mcr_http_status(int status_code, char *buf);
 char *
@@ -462,7 +463,7 @@ mcr_http_protocol(char *buf)
 
 
 char *
-mcr_http_version(const char *version, char *buf)
+mcr_http_protocol_version(const char *version, char *buf)
 {
     strcat(buf, version);
     strcat(buf, " ");
@@ -530,11 +531,43 @@ mcr_http_content_type(const char *content_type, char *buf)
     return buf;
 }
 
+
+/*TODO: body content maybe raw data, take care of it, */
 char *
-mcr_http_body(const char *body, char *buf)
+mcr_http_body(const char *body, size_t body_len, char *buf)
 {
+    int offset = strlen(buff) + 1;
     if (body)
-        strcat(buf, body);
+        memcpy(buf + offset, body, body_len);
+    return buf;
+}
+
+
+char *
+mcr_http_accept_ranges(const char *ranges, char *buf)
+{
+    strcat(buf, "Accept-Ranges: ");
+    strcat(buf, "bytes ");
+    if (ranges)
+        strcat(buf, ranges);
+    return buf;
+}
+
+
+char *
+mcr_http_date(const char *date, char *buf)
+{
+    strcat(buf, "Date: ");
+    if (date) {
+        strcat(buf, date);
+    }
+    else {
+        char tbuf[128];
+        time_t now = time(0);
+        struct tm tm = *gmtime(&now);
+        strftime(tbuf, sizeof(tbuf), "%a, %d %b %Y %H:%M:%S %Z", &tm);
+        strcat(buf, tbuf);
+    }
     return buf;
 }
 
@@ -544,16 +577,17 @@ mcr_http_body(const char *body, char *buf)
 
 
 char *
-mcr_make_http_response(int status_code, int errnum, const char *body, size_t content_len, const char *content_type,  const char *version, char *response)
+mcr_make_http_response(int status_code, int errnum, const char *body, size_t content_len, const char *content_type,  const char *protocol, char *response)
 {
     /* status line */
     mcr_http_protocol(response);
-    if (version == NULL ) {
-        mcr_http_version(DEFAULT_HTTP_VERSION, response);
+    if (protocol == NULL ) {
+        mcr_http_protocol_version(DEFAULT_HTTP_VERSION, response);
     }
     else {
-        mcr_http_version(version, response);
+        mcr_http_protocol_version(protocol, response);
     }
+
     mcr_http_status(status_code, response);
     mcr_http_errno(errnum, response);
     mcr_http_newline(response);
@@ -562,6 +596,10 @@ mcr_make_http_response(int status_code, int errnum, const char *body, size_t con
     mcr_http_servername(SERVER_NAME, response);
     mcr_http_newline(response);
     
+    /* accept-ranges */
+    mcr_http_accept_ranges(NULL, response);
+    mcr_http_newline(response);
+
     /* content-len */
     mcr_http_content_lenth(content_len, response);
     mcr_http_newline(response);
@@ -573,8 +611,13 @@ mcr_make_http_response(int status_code, int errnum, const char *body, size_t con
     else {
        mcr_http_content_type(content_type, response);
     }
-
     mcr_http_newline(response);
+
+    /* Date */
+    mcr_http_date(NULL, response);
+    mcr_http_newline(response);
+
+    /* blank line */
     mcr_http_newline(response);
 
     /* content-body */
