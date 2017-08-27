@@ -397,6 +397,10 @@ mcr_get_mimetype(const char *filename, char *mimetype)
         }
     }
 
+    /* default mimeType:text/html */
+    strcpy(mimetype, mimeT[0]);
+    strcat(mimetype, support_mimes[0]);
+
     return -1;
 }
 
