@@ -3,15 +3,14 @@
 
 ## Overview
 mcr-server is an original http-server based on tcp.
-For now, it is only for learning linux environment programming. Common used programming skills such as socket/io ,tcp/ip and http protocol, multiple threads, multiple processes ... All of them are necessary for this project.
-In the future, it will serve for deploying static pages(some interesting web pages crawled from net).
+It is designed for deploying static web pages. Also it's a good project for learner
 
 ## Features
-*	除libc/libpthread以外，它不依赖于的任何库
-*	服务器可配置
-*	基于线程模型和事件模型
-*	支持并发下载资源
-*	支持对象存储资源（七牛云）
+*	No library depency(except libc and libpthread)
+* Lightweight
+*	Service Configurable
+* High Responsiveness(kept by thread connections)
+*	Support mime types
 
 ## build and run
 ### 1.Get source code
@@ -27,10 +26,31 @@ make
 Executable file `mcr-server` will be generate in current directory.
 
 ### 3.Config and run
-Write server configurations to `yourconfigure.conf` file, and start mcr-server with option -c. Otherwise `default.conf` will be load.
+Write server configurations to `your-configure.conf` file, and start mcr-server with option -c. Otherwise `default.conf` will be load.
 ```sh
-./mcr-server [-c yourconfigure.conf] [-d]
+./mcr-server [-c your-configure.conf] [-d]
 ```
 
 ## Contributing
 Fork the mcr-server repository and create pull request, it will be processed as soon as possible.
+
+## Example
+Getting a mirror of [redis](https://redis.io) official site and deploying it by mcr-server.
+### 1. Get website mirror
+```sh
+wget redis.io -m 
+```
+### 2. Config the downloaded website directory as wwwroot
+```
+...
+wwwroot: realpath-of-redis.io
+...
+```
+Save the config file name as `redis-io.conf`
+### 3. Deploy
+```sh 
+./mcr-server -c redis-io.conf -d
+```
+### 4. Have fun.
+Open browser and go localhost:8080/
+You will get [this](http://zz.culti.site:8082/) vision.
