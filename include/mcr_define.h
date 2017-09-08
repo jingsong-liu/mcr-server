@@ -9,4 +9,6 @@
 #define MCR_ERR         -1
 #define MCR_EAGAIN      -2
 
+#define MCR_RBUFF_MAXSIZE  512*1024
+#define MCR_TBUFF_MAXSIZE  1024*1024
 #endif

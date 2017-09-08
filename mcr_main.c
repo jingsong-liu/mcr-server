@@ -30,16 +30,11 @@ cli_conn(void* arg) {
     size_t recved = 0;
     int parse_ret = MCR_OK;
 
-    size_t recv_buflen = 80*1024;
-    char *recv_buf = malloc(recv_buflen*sizeof(char));
-    if (recv_buf == NULL) {
-        goto out;
-    }
-
+    size_t recv_buflen = MCR_RBUFF_MAXSIZE;
+    char recv_buf[recv_buflen];
 
     mcr_http *mhttp = mcr_make_http(wwwroot);
     if (mhttp == NULL) {
-        free(recv_buf);
         goto out;
     }
 
@@ -47,7 +42,7 @@ cli_conn(void* arg) {
 
     while(1)
     {
-        recved = recv(sock, recv_buf, 1024, 0);
+        recved = recv(sock, recv_buf, recv_buflen, 0);
         if (recved < 0) {
             printf("sock read error: %s\n",  strerror(errno)); 
             break;
@@ -67,7 +62,6 @@ cli_conn(void* arg) {
         }
     }
 
-    free(recv_buf);
     mcr_free_http(mhttp);
 
 out:

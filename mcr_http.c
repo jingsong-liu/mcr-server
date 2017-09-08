@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
+#include <linux/limits.h>
 #include "include/mcr_http.h"
 #include "include/mcr_define.h"
 
@@ -195,7 +196,7 @@ mcr_make_http(const char *wwwroot)
         return NULL;
     }
 
-    http_context *context = mcr_make_http_context(&(mhttp->sock), wwwroot, 80*1024);
+    http_context *context = mcr_make_http_context(&(mhttp->sock), wwwroot, MCR_TBUFF_MAXSIZE);
     context->complete_flag = 0;
     if (context == NULL) {
         mcr_free_http(mhttp);
@@ -353,24 +354,24 @@ url_handler(const char* path)
 
 
 char*
-mcr_uri_of_wwwroot(const char *wwwroot, const char *url)
+mcr_uri_of_wwwroot(const char *wwwroot, const char *url, char *uri_of_wwwroot)
 {
 
     /* translate url to file path in workdir */
     const char index_html[] = "/index.html";
     int extl = strlen(url) > strlen(index_html) ? strlen(url) : strlen(index_html);
-    int uri_len = strlen(wwwroot) + extl + 1;
-    char *uri= malloc(uri_len*sizeof(char));
-    if (uri == NULL)
+
+    if ( strlen(wwwroot) + extl + 1 > NAME_MAX + PATH_MAX)
         return NULL;
-    memcpy(uri, wwwroot, strlen(wwwroot));
+
+    memcpy(uri_of_wwwroot, wwwroot, strlen(wwwroot));
     if (!strcmp(url, "/")) {
-        memcpy(uri + strlen(wwwroot), index_html, strlen(index_html) + 1);
+        memcpy(uri_of_wwwroot + strlen(wwwroot), index_html, strlen(index_html) + 1);
     }
     else {
-        memcpy(uri + strlen(wwwroot), url, strlen(url) + 1);
+        memcpy(uri_of_wwwroot + strlen(wwwroot), url, strlen(url) + 1);
     }
-    return uri;
+    return uri_of_wwwroot;
 }
 
 
@@ -408,46 +409,38 @@ mcr_get_mimetype(const char *filename, char *mimetype)
 int
 mcr_route(http_context *context)
 {
-    /* costume handler */
+    /* handler to cgi */
     if (url_handler(context->url) == 0) {
         return  0;
     }
 
     /* static file */
-    char *body = NULL;
-    char *sfile = mcr_uri_of_wwwroot(context->wwwroot, context->url);
+    char sfile[PATH_MAX + NAME_MAX];
+    char body[MCR_TBUFF_MAXSIZE * 3/4];
+    if (NULL == mcr_uri_of_wwwroot(context->wwwroot, context->url, sfile)) {
+        return -1;
+    }
+
     int fd = open(sfile, O_RDONLY);
     if (fd < 0) {
         close(fd);
-        free(sfile);
         goto not_found;
     }
 
-    body = malloc(64*1024*sizeof(char));
-    if (body == NULL) {
-        close(fd);
-        free(sfile);
-        close(fd);
-        return -1;
-    }
-    context->content_len = read(fd, body, 64*1024);
+    context->content_len = read(fd, body, MCR_TBUFF_MAXSIZE * 3/4 );
 
     if (context->content_len > 0) {
-        char content_type[128];
+        char content_type[NAME_MAX];
         mcr_get_mimetype(sfile, content_type);
         context->buf_len = mcr_make_http_response(200, 0, body, context->content_len, content_type, NULL, context->buffer);
         goto ok;
     } else {
         close(fd);
-        free(sfile);
-        free(body);
         goto not_found;
     }
 
 ok:
     close(fd);
-    free(sfile);
-    free(body);
     return 0;
 
 not_found:
