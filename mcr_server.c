@@ -153,7 +153,7 @@ get_addr4_by_host(const char* port, struct addrinfo** ai_list)
 
     if (0 != getaddrinfo(NULL, port, &hint, ai_list))
     {
-        printf("get host address error:%s", gai_strerror(errno));
+        printf("get host address error:%s\n", gai_strerror(errno));
         return -1;
     }
     else {
