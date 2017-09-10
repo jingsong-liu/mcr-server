@@ -1,15 +1,9 @@
 #include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
-#include <arpa/inet.h>
-#include <pthread.h>
-#include <fcntl.h>
-#include <netdb.h>
 #include "include/mcr_config.h"
 #include "include/mcr_define.h"
 #include "include/mcr_server.h"
