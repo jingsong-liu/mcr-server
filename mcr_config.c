@@ -7,7 +7,7 @@
 #include <stdio.h>
 
 #define SERVER_OPT_BASE         0x80000000
-#define OPT_HOSTNAME            SERVER_OPT_BASE + 1
+#define OPT_SERVERNAME          SERVER_OPT_BASE + 1
 #define OPT_SERVICE             SERVER_OPT_BASE + 2
 #define OPT_BACKLOG             SERVER_OPT_BASE + 3
 #define OPT_PORT                SERVER_OPT_BASE + 4
@@ -21,7 +21,7 @@ struct config_opt {
 };
 
 static const struct config_opt server_opt_array[] = {
-    {"HostName",       OPT_HOSTNAME,   HOST_NAME_MAX},
+    {"ServerName",     OPT_SERVERNAME, SERVICE_NAME_MAX},
     {"Service",        OPT_SERVICE,    SERVICE_NAME_MAX},
     {"BackLog",        OPT_BACKLOG,    BACKLOG_MAX},
     {"Port",           OPT_PORT,       PORT_MAX},
@@ -91,14 +91,14 @@ read_server_config(const char* path, struct server_config* sc)
 		listNode* node = NULL;
         while (NULL != (node = listNext(li))) {
 			dict *d = node->value;
-            if (!strcmp(get_optname(OPT_HOSTNAME), d->key)) {
-                strncpy(sc->hostname, *(d->values), sizeof(sc->hostname));
+            if (!strcmp(get_optname(OPT_SERVERNAME), d->key)) {
+                strncpy(sc->servername, *(d->values), sizeof(sc->servername));
             }
             else if (!strcmp(get_optname(OPT_SERVICE), d->key)) {
                 strncpy(sc->service, *(d->values), sizeof(sc->service));
             }
             else if (!strcmp(get_optname(OPT_PORT), d->key)) {
-               sc->port = atoi(*(d->values)); 
+                strncpy(sc->port, *(d->values), sizeof(sc->port));
             }
             else if (!strcmp(get_optname(OPT_BACKLOG), d->key)) {
                 sc->backlog = atoi(*(d->values));
@@ -127,8 +127,8 @@ read_server_config(const char* path, struct server_config* sc)
 char*
 dump_server_config(struct server_config* sc, char* buf, size_t size)
 {
-    snprintf(buf, size, "%s\n%s\n%d\n%d\n",
-        sc->hostname, sc->service, sc->port, sc->backlog);
+    snprintf(buf, size, "%s\n%s\n%s\n%d\n",
+        sc->servername, sc->service, sc->port, sc->backlog);
 
     return buf;
 }
