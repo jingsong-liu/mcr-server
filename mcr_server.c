@@ -144,6 +144,7 @@ run_serverloop(int server_sock, struct server_config config)
 int
 get_addr4_by_host(const char* port, struct addrinfo** ai_list)
 {
+    int retcode;
     struct addrinfo hint;
     memset(&hint, 0, sizeof(hint));
     hint.ai_family = AF_INET;
@@ -151,9 +152,9 @@ get_addr4_by_host(const char* port, struct addrinfo** ai_list)
     /* on any IP address, using port number */
     hint.ai_flags = AI_PASSIVE | AI_ADDRCONFIG |AI_NUMERICSERV;
 
-    if (0 != getaddrinfo(NULL, port, &hint, ai_list))
+    if (0 != (retcode = getaddrinfo(NULL, port, &hint, ai_list)))
     {
-        printf("get host address error:%s\n", gai_strerror(errno));
+        printf("get host address error:%s\n", gai_strerror(retcode));
         return -1;
     }
     else {
