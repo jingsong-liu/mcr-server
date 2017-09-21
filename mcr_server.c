@@ -34,7 +34,8 @@ cli_conn(void* arg)
 
     size_t recv_buflen = MCR_RBUFF_MAXSIZE;
     char recv_buf[recv_buflen];
-
+    
+    pthread_detach(pthread_self());
     mcr_http *mhttp = mcr_make_http(wwwroot);
     if (mhttp == NULL) {
         goto out;
@@ -112,7 +113,7 @@ run_serverloop(int server_sock, struct server_config config)
 {
     struct sockaddr_in client_addr;
     socklen_t client_addr_len= sizeof(client_addr);
-    pthread_t pid;
+    pthread_t tid;
     struct cli_args cargs;
 
     while(1) {
@@ -127,15 +128,11 @@ run_serverloop(int server_sock, struct server_config config)
 
         cargs.fd = new_fd;
         cargs.wwwroot = config.wwwroot;
-        if(0 != pthread_create(&pid, NULL, cli_conn, (void *)&cargs)) {
+        if(0 != pthread_create(&tid, NULL, cli_conn, (void *)&cargs)) {
             printf("create pthread error: %s\n", strerror(errno));
             return -1;
         }
-
-        pthread_detach(pid);
     }
-
-    //cloase child thread?
 
     return 0;
 }
